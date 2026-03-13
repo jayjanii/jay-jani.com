@@ -1,0 +1,9 @@
+name = "real-personal"
+compatibility_date = "2024-12-01"
+
+# After creating the database, replace the database_id below:
+#   npx wrangler d1 create climbing-logs
+[[d1_databases]]
+binding = "DB"
+database_name = "climbing-logs"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"

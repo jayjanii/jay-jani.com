@@ -1,0 +1,342 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
+---
+
+<Layout title="Climbing Admin - Jay Jani">
+  <!-- ── Auth gate overlay ──────────────────────────── -->
+  <div id="auth-gate" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-8 max-w-sm w-full mx-4">
+      <h2 class="text-lg font-bold text-white mb-1">Admin Access</h2>
+      <p class="text-gray-500 text-xs mb-5">Enter the admin password to continue.</p>
+      <input type="password" id="auth-password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white text-sm mb-3 focus:border-blue-500 outline-none" />
+      <p id="auth-error" class="text-red-400 text-xs mb-3 hidden">Incorrect password. Try again.</p>
+      <button id="auth-submit" class="w-full px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">Enter</button>
+    </div>
+  </div>
+
+  <!-- ── Admin UI (hidden until authed) ─────────────── -->
+  <div id="admin-ui" class="max-w-3xl mx-auto py-10 px-4 hidden">
+    <div class="flex items-center justify-between mb-8">
+      <a href="/climbing" class="text-blue-400 hover:underline text-sm">&larr; Climbing Log</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-white mb-8">Admin Dashboard</h1>
+
+    <!-- ── Form ─────────────────────────────────── -->
+    <form id="climb-form" class="bg-gray-900/50 border border-gray-800 rounded-xl p-6 mb-12 space-y-5">
+      <input type="hidden" id="edit-id" value="" />
+
+      <div class="grid grid-cols-3 gap-4">
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Grade
+          <select id="f-grade" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
+            {GRADES.map(g => <option value={g}>{g}</option>)}
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Color
+          <select id="f-color" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
+            {HOLD_COLORS.map(c => <option value={c}>{c}</option>)}
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Date
+          <input type="date" id="f-date" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white" />
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Location
+        <input type="text" id="f-location" placeholder="e.g. Pacific Edge, Santa Cruz" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+      </label>
+
+      <div>
+        <span class="text-gray-400 text-xs block mb-2">Tags</span>
+        <div id="tag-pills" class="flex flex-wrap gap-2">
+          {TAGS.map(t => (
+            <button type="button" data-tag={t} class="tag-pill px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors">
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Notes <span class="text-gray-600">(optional)</span>
+        <textarea id="f-notes" rows={2} class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 resize-y" placeholder="Beta, observations..."></textarea>
+      </label>
+
+      <div>
+        <span class="text-gray-400 text-xs block mb-2">Images <span class="text-gray-600">(max 3)</span></span>
+        <label id="drop-zone" class="flex items-center justify-center h-24 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:border-blue-500 transition-colors text-gray-500 text-xs">
+          Click or drop images here
+          <input type="file" id="f-images" multiple accept="image/*" class="hidden" />
+        </label>
+        <div id="img-preview" class="flex gap-3 mt-3"></div>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="btn-submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">
+          Add Climb
+        </button>
+        <button type="button" id="btn-cancel" class="px-6 py-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors text-sm hidden">
+          Cancel Edit
+        </button>
+      </div>
+    </form>
+
+    <h2 class="text-lg font-bold text-white mb-4">Climb History <span id="log-count" class="text-gray-500 font-normal text-sm"></span></h2>
+    <div id="log-list" class="space-y-3"></div>
+  </div>
+</Layout>
+
+<script>
+  import {
+    type ClimbingLog, HOLD_COLORS, COLOR_HEX,
+    fetchLogs, createLog, updateLog, deleteLog,
+    verifyPassword, resizeImage, todayISO,
+  } from '../../lib/climbing';
+
+  // ── Auth gate ──────────────────────────────────────
+  const gate      = document.getElementById('auth-gate') as HTMLDivElement;
+  const adminUI   = document.getElementById('admin-ui') as HTMLDivElement;
+  const authPw    = document.getElementById('auth-password') as HTMLInputElement;
+  const authErr   = document.getElementById('auth-error') as HTMLParagraphElement;
+  const authBtn   = document.getElementById('auth-submit') as HTMLButtonElement;
+
+  async function tryAuth() {
+    const pw = authPw.value;
+    if (!pw) return;
+    authBtn.disabled = true;
+    authBtn.textContent = 'Checking...';
+
+    const ok = await verifyPassword(pw);
+    if (ok) {
+      sessionStorage.setItem('admin-token', pw);
+      gate.classList.add('hidden');
+      adminUI.classList.remove('hidden');
+      await loadList();
+    } else {
+      authErr.classList.remove('hidden');
+      authPw.value = '';
+    }
+    authBtn.disabled = false;
+    authBtn.textContent = 'Enter';
+  }
+
+  authBtn.addEventListener('click', tryAuth);
+  authPw.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+
+  // Check existing session
+  if (sessionStorage.getItem('admin-token')) {
+    gate.classList.add('hidden');
+    adminUI.classList.remove('hidden');
+    loadList();
+  }
+
+  // ── DOM refs ───────────────────────────────────────
+  const form      = document.getElementById('climb-form') as HTMLFormElement;
+  const editIdEl  = document.getElementById('edit-id') as HTMLInputElement;
+  const gradeEl   = document.getElementById('f-grade') as HTMLSelectElement;
+  const colorEl   = document.getElementById('f-color') as HTMLSelectElement;
+  const dateEl    = document.getElementById('f-date') as HTMLInputElement;
+  const locEl     = document.getElementById('f-location') as HTMLInputElement;
+  const notesEl   = document.getElementById('f-notes') as HTMLTextAreaElement;
+  const imagesEl  = document.getElementById('f-images') as HTMLInputElement;
+  const preview   = document.getElementById('img-preview') as HTMLDivElement;
+  const submitBtn = document.getElementById('btn-submit') as HTMLButtonElement;
+  const cancelBtn = document.getElementById('btn-cancel') as HTMLButtonElement;
+  const logList   = document.getElementById('log-list') as HTMLDivElement;
+  const logCount  = document.getElementById('log-count') as HTMLSpanElement;
+  const dropZone  = document.getElementById('drop-zone') as HTMLLabelElement;
+
+  dateEl.value = todayISO();
+
+  let pendingImages: string[] = [];
+  let selectedTags: Set<string> = new Set();
+
+  // ── Tag pills ──
+  document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag!;
+      if (selectedTags.has(tag)) {
+        selectedTags.delete(tag);
+        btn.classList.remove('bg-blue-600/30', 'border-blue-500', 'text-blue-300');
+        btn.classList.add('border-gray-700', 'text-gray-400');
+      } else {
+        selectedTags.add(tag);
+        btn.classList.add('bg-blue-600/30', 'border-blue-500', 'text-blue-300');
+        btn.classList.remove('border-gray-700', 'text-gray-400');
+      }
+    });
+  });
+
+  function setTagPills(tags: string[]) {
+    selectedTags = new Set(tags);
+    document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(btn => {
+      const active = selectedTags.has(btn.dataset.tag!);
+      btn.classList.toggle('bg-blue-600/30', active);
+      btn.classList.toggle('border-blue-500', active);
+      btn.classList.toggle('text-blue-300', active);
+      btn.classList.toggle('border-gray-700', !active);
+      btn.classList.toggle('text-gray-400', !active);
+    });
+  }
+
+  // ── Image handling ──
+  async function handleFiles(files: FileList | File[]) {
+    for (const file of Array.from(files)) {
+      if (pendingImages.length >= 3) break;
+      pendingImages.push(await resizeImage(file));
+    }
+    renderPreviews();
+  }
+
+  function renderPreviews() {
+    preview.innerHTML = '';
+    pendingImages.forEach((src, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'relative group';
+      wrap.innerHTML = `
+        <img src="${src}" class="w-20 h-20 object-cover rounded border border-gray-700" />
+        <button type="button" data-rm="${i}" class="absolute -top-2 -right-2 w-5 h-5 bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+      `;
+      wrap.querySelector('button')!.addEventListener('click', () => {
+        pendingImages.splice(i, 1);
+        renderPreviews();
+      });
+      preview.appendChild(wrap);
+    });
+  }
+
+  imagesEl.addEventListener('change', () => { if (imagesEl.files) handleFiles(imagesEl.files); imagesEl.value = ''; });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-blue-500'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border-blue-500');
+    if (e.dataTransfer?.files) handleFiles(e.dataTransfer.files);
+  });
+
+  // ── Form submit ──
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    const entry = {
+      grade: gradeEl.value,
+      color: colorEl.value,
+      tags: [...selectedTags],
+      date: dateEl.value || todayISO(),
+      location: locEl.value.trim(),
+      notes: notesEl.value.trim(),
+      images: [...pendingImages],
+    };
+
+    try {
+      if (editIdEl.value) {
+        await updateLog(editIdEl.value, entry);
+      } else {
+        await createLog(entry);
+      }
+      resetForm();
+      await loadList();
+    } catch (err: any) {
+      if (err.message === 'Unauthorized') {
+        alert('Session expired. Please re-enter the admin password.');
+        sessionStorage.removeItem('admin-token');
+        gate.classList.remove('hidden');
+        adminUI.classList.add('hidden');
+      } else {
+        alert('Failed to save. Please try again.');
+      }
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = editIdEl.value ? 'Save Changes' : 'Add Climb';
+  });
+
+  cancelBtn.addEventListener('click', resetForm);
+
+  function resetForm() {
+    editIdEl.value = '';
+    gradeEl.value = 'V0';
+    colorEl.value = HOLD_COLORS[0];
+    dateEl.value = todayISO();
+    locEl.value = '';
+    notesEl.value = '';
+    pendingImages = [];
+    selectedTags.clear();
+    setTagPills([]);
+    renderPreviews();
+    submitBtn.textContent = 'Add Climb';
+    cancelBtn.classList.add('hidden');
+  }
+
+  function editEntry(log: ClimbingLog) {
+    editIdEl.value = log.id;
+    gradeEl.value = log.grade;
+    colorEl.value = log.color;
+    dateEl.value = log.date;
+    locEl.value = log.location;
+    notesEl.value = log.notes;
+    pendingImages = [...log.images];
+    setTagPills(log.tags);
+    renderPreviews();
+    submitBtn.textContent = 'Save Changes';
+    cancelBtn.classList.remove('hidden');
+    form.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ── Load & render list ──
+  async function loadList() {
+    const logs = await fetchLogs();
+    logCount.textContent = `(${logs.length})`;
+    logList.innerHTML = '';
+
+    if (logs.length === 0) {
+      logList.innerHTML = '<p class="text-gray-600 text-sm">No climbs logged yet.</p>';
+      return;
+    }
+
+    for (const log of logs) {
+      const hex = COLOR_HEX[log.color] || '#888';
+      const card = document.createElement('div');
+      card.className = 'bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex gap-4 items-start';
+      card.innerHTML = `
+        <div class="shrink-0 pt-0.5">
+          <span class="inline-block w-3 h-3 rounded-full" style="background:${hex}"></span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-bold text-white text-sm">${log.grade}</span>
+            <span class="text-gray-500 text-xs">${new Date(log.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            ${log.location ? `<span class="text-gray-600 text-xs">${log.location}</span>` : ''}
+          </div>
+          ${log.tags.length ? `<div class="flex flex-wrap gap-1 mt-1.5">${log.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
+          ${log.notes ? `<p class="text-gray-500 text-xs mt-1.5">${log.notes}</p>` : ''}
+          ${log.images.length ? `<div class="flex gap-2 mt-2">${log.images.map(src => `<img src="${src}" class="w-14 h-14 object-cover rounded border border-gray-700" />`).join('')}</div>` : ''}
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button data-edit="${log.id}" class="text-gray-500 hover:text-blue-400 text-xs transition-colors">Edit</button>
+          <button data-del="${log.id}" class="text-gray-500 hover:text-red-400 text-xs transition-colors">Delete</button>
+        </div>
+      `;
+
+      card.querySelector(`[data-edit="${log.id}"]`)!.addEventListener('click', () => editEntry(log));
+      card.querySelector(`[data-del="${log.id}"]`)!.addEventListener('click', async () => {
+        if (!confirm(`Delete ${log.grade} on ${log.date}?`)) return;
+        try {
+          await deleteLog(log.id);
+          await loadList();
+        } catch {
+          alert('Failed to delete. Session may have expired.');
+        }
+      });
+
+      logList.appendChild(card);
+    }
+  }
+</script>

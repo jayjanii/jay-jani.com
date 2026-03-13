@@ -1,0 +1,578 @@
+---
+interface Props {
+  controls?: boolean;
+}
+
+const { controls = false } = Astro.props;
+---
+
+<div class="flex flex-col w-full">
+  <div id="gravity-sim-container" class="w-full h-[500px] relative overflow-hidden rounded border border-gray-800 bg-transparent mt-4 cursor-pointer">
+    <canvas id="gravity-canvas" class="block w-full h-full bg-transparent"></canvas>
+    <div class="absolute top-3 right-3 text-[10px] text-gray-500 font-mono z-20 pointer-events-none">
+      (Drag to Rotate | Scroll to Zoom)
+    </div>
+  </div>
+
+  {controls && (
+    <div id="gravity-controls" class="flex flex-col md:flex-row gap-6 mt-6 p-4 border border-gray-800 rounded bg-gray-900/30 text-sm">
+      <div class="flex flex-col gap-2 flex-1">
+        <label class="flex justify-between text-gray-300">
+          <span>Bodies (<span id="val-n">10</span>)</span>
+          <input type="range" id="sim-n" min="2" max="100" step="1" value="10" class="w-1/2 accent-blue-500" />
+        </label>
+        <label class="flex justify-between text-gray-300">
+          <span>Gravity G (<span id="val-g">1.0</span>)</span>
+          <input type="range" id="sim-g" min="0.1" max="5.0" step="0.1" value="1.0" class="w-1/2 accent-blue-500" />
+        </label>
+        <label class="flex justify-between text-gray-300">
+          <span>Time Step dt (<span id="val-dt">0.005</span>)</span>
+          <input type="range" id="sim-dt" min="0.001" max="0.02" step="0.001" value="0.005" class="w-1/2 accent-blue-500" />
+        </label>
+      </div>
+      <div class="flex items-center">
+        <button id="sim-reset" class="px-6 py-2 bg-gray-200 text-black font-bold rounded hover:bg-white transition-colors w-full md:w-auto">
+          Reset Simulation
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+
+<script>
+  import * as THREE from 'three';
+
+  const canvas = document.getElementById('gravity-canvas') as HTMLCanvasElement;
+  const container = document.getElementById('gravity-sim-container') as HTMLDivElement;
+
+  if (canvas && container) {
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
+    camera.position.set(0, 70, 100);
+    camera.lookAt(0, -10, 0);
+
+    const TRAIL_LENGTH = 80;
+    let planetPoints: THREE.Points;
+    let trails: THREE.LineSegments;
+    let history: Float32Array[] = [];
+    let historyIdx = 0;
+    const numSegments = TRAIL_LENGTH - 1;
+    let trailVertices: Float32Array;
+    let currentMasses: Float32Array;
+    let currentN = 10;
+
+    // ── Spacetime Grid ──────────────────────────────────────────────────
+    const gridUniforms = {
+      u_bodies: { value: new Float32Array(50 * 4) },
+      u_numBodies: { value: 0 },
+      u_G: { value: 1.0 }
+    };
+
+    const gridMaterial = new THREE.ShaderMaterial({
+      uniforms: gridUniforms,
+      vertexShader: `
+        #define MAX_BODIES 50
+        uniform vec4 u_bodies[MAX_BODIES];
+        uniform int u_numBodies;
+        uniform float u_G;
+        varying float vDeformation;
+
+        void main() {
+          vec3 pos = position;
+          float def = 0.0;
+          for (int i = 0; i < MAX_BODIES; i++) {
+            if (i >= u_numBodies) break;
+            float d = distance(pos.xz, u_bodies[i].xyz.xz);
+            float mass = u_bodies[i].w;
+            def -= 2.0 * sqrt(max(u_G * mass * 0.1, 0.0)) / sqrt(d + 1.0);
+          }
+          pos.y = def - 10.0;
+          vDeformation = def;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying float vDeformation;
+        void main() {
+          float intensity = clamp(-vDeformation / 40.0, 0.0, 1.0);
+          vec3 color = mix(vec3(0.2), vec3(0.4), intensity);
+          gl_FragColor = vec4(color, 0.4 + intensity * 0.6);
+        }
+      `,
+      wireframe: true,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const gridGeo = new THREE.PlaneGeometry(300, 300, 60, 60);
+    gridGeo.rotateX(-Math.PI / 2);
+    scene.add(new THREE.Mesh(gridGeo, gridMaterial));
+
+    // ── Sun (emissive mesh + glow sprite) ───────────────────────────────
+    const sunGroup = new THREE.Group();
+
+    const sunCoreMat = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float rim = 1.0 - max(0.0, dot(vNormal, vViewDir));
+          vec3 core = vec3(1.0, 0.95, 0.8);
+          vec3 edge = vec3(1.0, 0.6, 0.1);
+          vec3 color = mix(core, edge, rim * rim);
+          gl_FragColor = vec4(color * (1.8 + rim * 0.5), 1.0);
+        }
+      `,
+    });
+    sunGroup.add(new THREE.Mesh(new THREE.SphereGeometry(3, 32, 32), sunCoreMat));
+
+    const createGlowTexture = () => {
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d')!;
+      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0,    'rgba(255, 240, 200, 0.7)');
+      g.addColorStop(0.12, 'rgba(255, 210, 140, 0.35)');
+      g.addColorStop(0.35, 'rgba(255, 160, 60, 0.10)');
+      g.addColorStop(0.65, 'rgba(255, 110, 20, 0.02)');
+      g.addColorStop(1,    'rgba(255, 80, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(c);
+    };
+
+    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: createGlowTexture(),
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    }));
+    glowSprite.scale.set(30, 30, 1);
+    sunGroup.add(glowSprite);
+    scene.add(sunGroup);
+
+    // ── Planet point texture ────────────────────────────────────────────
+    const createSolidCircleTexture = () => {
+      const size = 128;
+      const tc = document.createElement('canvas');
+      tc.width = size; tc.height = size;
+      const ctx = tc.getContext('2d')!;
+      const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      grad.addColorStop(0,   'rgba(255,255,255,1)');
+      grad.addColorStop(0.4, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.8)');
+      grad.addColorStop(1,   'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      return new THREE.CanvasTexture(tc);
+    };
+
+    // ── Planet shader material ──────────────────────────────────────────
+    const planetUniforms = {
+      pointTexture:    { value: createSolidCircleTexture() },
+      u_sunPos:        { value: new THREE.Vector3(0, 0, 0) },
+      u_viewportHeight:{ value: container.clientHeight * window.devicePixelRatio },
+      u_fov:           { value: camera.fov * Math.PI / 180.0 },
+    };
+
+    const planetMaterial = new THREE.ShaderMaterial({
+      uniforms: planetUniforms,
+      vertexShader: `
+        attribute float size;
+        attribute vec3 color;
+        uniform float u_viewportHeight;
+        uniform float u_fov;
+        uniform vec3 u_sunPos;
+
+        varying vec3 vColor;
+        varying vec3 vLightDirView;
+
+        void main() {
+          vColor = color;
+
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vec4 mvPosition = viewMatrix * worldPos;
+
+          // Light direction toward sun, transformed into view space so it
+          // lines up with the billboard-normal we compute in the fragment shader.
+          vec3 lightDir_world = normalize(u_sunPos - worldPos.xyz);
+          vLightDirView = normalize((viewMatrix * vec4(lightDir_world, 0.0)).xyz);
+
+          // Perspective-correct sizing: scales naturally with FOV zoom
+          float projScale = u_viewportHeight / (2.0 * tan(u_fov * 0.5));
+          gl_PointSize = clamp(size * projScale / -mvPosition.z, 2.0, 256.0);
+
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D pointTexture;
+        varying vec3 vColor;
+        varying vec3 vLightDirView;
+
+        void main() {
+          vec2 coord = gl_PointCoord * 2.0 - 1.0;
+          float r2 = dot(coord, coord);
+          if (r2 > 1.0) discard;
+
+          // Fake sphere normal (billboard faces camera → view-space)
+          float z = sqrt(1.0 - r2);
+          vec3 normal = vec3(coord.x, -coord.y, z);
+
+          // Diffuse
+          float diff = max(0.0, dot(normal, vLightDirView));
+
+          // Blinn-Phong specular
+          vec3 viewDir = vec3(0.0, 0.0, 1.0);
+          vec3 halfDir = normalize(vLightDirView + viewDir);
+          float spec = pow(max(dot(normal, halfDir), 0.0), 40.0);
+
+          float ambient = 0.08;
+          vec3 litColor = vColor * (ambient + diff * 0.9) + vec3(1.0, 0.95, 0.85) * spec * 0.35;
+
+          gl_FragColor = vec4(litColor, 1.0);
+        }
+      `,
+      transparent: false,
+      blending: THREE.NormalBlending,
+      depthWrite: true
+    });
+
+    // ── Physics worker ──────────────────────────────────────────────────
+    const workerCode = `
+      let pos, vel, mass, acc;
+      let N, G, dt;
+      let softeningSq = 1.0;
+
+      function computeAccelerations() {
+        for (let i = 0; i < N * 3; i++) acc[i] = 0;
+        for (let i = 0; i < N; i++) {
+          let i3 = i * 3;
+          for (let j = i + 1; j < N; j++) {
+            let j3 = j * 3;
+            let dx = pos[j3] - pos[i3];
+            let dy = pos[j3+1] - pos[i3+1];
+            let dz = pos[j3+2] - pos[i3+2];
+            let distSq = dx*dx + dy*dy + dz*dz + softeningSq;
+            let invDist = 1.0 / Math.sqrt(distSq);
+            let invDist3 = invDist * invDist * invDist;
+
+            let fMag_i = G * mass[j] * invDist3;
+            acc[i3]   += dx * fMag_i;
+            acc[i3+1] += dy * fMag_i;
+            acc[i3+2] += dz * fMag_i;
+
+            let fMag_j = G * mass[i] * invDist3;
+            acc[j3]   -= dx * fMag_j;
+            acc[j3+1] -= dy * fMag_j;
+            acc[j3+2] -= dz * fMag_j;
+          }
+        }
+      }
+
+      self.onmessage = function(e) {
+        if (e.data.type === 'init') {
+          pos  = e.data.pos;
+          vel  = e.data.vel;
+          mass = e.data.mass;
+          N    = e.data.N;
+          G    = e.data.G;
+          dt   = e.data.dt;
+          acc  = new Float32Array(N * 3);
+          computeAccelerations();
+        } else if (e.data.type === 'step') {
+          const steps = e.data.steps || 1;
+          for (let s = 0; s < steps; s++) {
+            for (let i = 0; i < N * 3; i++) {
+              vel[i] += 0.5 * acc[i] * dt;
+              pos[i] += vel[i] * dt;
+            }
+            // Pin central star at origin
+            pos[0] = 0; pos[1] = 0; pos[2] = 0;
+            vel[0] = 0; vel[1] = 0; vel[2] = 0;
+
+            computeAccelerations();
+            for (let i = 0; i < N * 3; i++) {
+              vel[i] += 0.5 * acc[i] * dt;
+            }
+          }
+          const posCopy = new Float32Array(pos);
+          self.postMessage({ type: 'done', pos: posCopy }, [posCopy.buffer]);
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+
+    let isWorkerBusy = false;
+
+    // ── Worker → render bridge ──────────────────────────────────────────
+    worker.onmessage = function (e) {
+      if (e.data.type !== 'done') return;
+      const newPos = e.data.pos;
+      if (!planetPoints || !trails) { isWorkerBusy = false; return; }
+
+      // Sun mesh follows worker position (always 0,0,0 but kept general)
+      sunGroup.position.set(newPos[0], newPos[1], newPos[2]);
+
+      // Planet positions (indices 1..N-1 in worker → 0..numPlanets-1 in Points)
+      const numPlanets = currentN - 1;
+      const pArr = planetPoints.geometry.attributes.position.array as Float32Array;
+      for (let i = 1; i < currentN; i++) {
+        const pi = (i - 1) * 3;
+        pArr[pi]     = newPos[i * 3];
+        pArr[pi + 1] = newPos[i * 3 + 1];
+        pArr[pi + 2] = newPos[i * 3 + 2];
+      }
+      planetPoints.geometry.attributes.position.needsUpdate = true;
+
+      // Trail history (stores all N bodies for indexing consistency)
+      history[historyIdx].set(newPos);
+
+      let pIdx = historyIdx;
+      for (let s = 0; s < numSegments; s++) {
+        const currIdx = pIdx;
+        const prevIdx = (pIdx - 1 + TRAIL_LENGTH) % TRAIL_LENGTH;
+        const currPos = history[currIdx];
+        const prevPos = history[prevIdx];
+
+        for (let p = 0; p < numPlanets; p++) {
+          const bodyIdx = p + 1;
+          const base = (p * numSegments + s) * 6;
+          trailVertices[base]     = currPos[bodyIdx * 3];
+          trailVertices[base + 1] = currPos[bodyIdx * 3 + 1];
+          trailVertices[base + 2] = currPos[bodyIdx * 3 + 2];
+          trailVertices[base + 3] = prevPos[bodyIdx * 3];
+          trailVertices[base + 4] = prevPos[bodyIdx * 3 + 1];
+          trailVertices[base + 5] = prevPos[bodyIdx * 3 + 2];
+        }
+        pIdx = prevIdx;
+      }
+      trails.geometry.attributes.position.needsUpdate = true;
+      historyIdx = (historyIdx + 1) % TRAIL_LENGTH;
+
+      // Grid deformation uniforms (all bodies including sun)
+      const gridArr = gridMaterial.uniforms.u_bodies.value;
+      const count = Math.min(currentN, 50);
+      for (let i = 0; i < count; i++) {
+        gridArr[i * 4]     = newPos[i * 3];
+        gridArr[i * 4 + 1] = newPos[i * 3 + 1];
+        gridArr[i * 4 + 2] = newPos[i * 3 + 2];
+        gridArr[i * 4 + 3] = currentMasses[i];
+      }
+      gridMaterial.uniforms.u_numBodies.value = count;
+
+      isWorkerBusy = false;
+    };
+
+    // ── Simulation init ─────────────────────────────────────────────────
+    const initSim = (N: number, G: number, dt: number) => {
+      currentN = N;
+      if (planetPoints) scene.remove(planetPoints);
+      if (trails) scene.remove(trails);
+
+      const numPlanets = N - 1;
+
+      // Full arrays for worker (sun + planets)
+      const pos  = new Float32Array(N * 3);
+      const vel  = new Float32Array(N * 3);
+      const mass = new Float32Array(N);
+
+      // Render-only arrays (planets)
+      const planetPos = new Float32Array(numPlanets * 3);
+      const colors    = new Float32Array(numPlanets * 3);
+      const sizes     = new Float32Array(numPlanets);
+
+      // Body 0 = central star (handled by sunGroup mesh)
+      mass[0] = 10000;
+
+      const colorPalette = [
+        new THREE.Color(0x888888),
+        new THREE.Color(0xe3bb76),
+        new THREE.Color(0x4b70dd),
+        new THREE.Color(0xc1440e),
+        new THREE.Color(0xd39c7e),
+        new THREE.Color(0x4b70dd),
+        new THREE.Color(0x8cb1de),
+      ];
+
+      for (let i = 1; i < N; i++) {
+        const radius = 20 + Math.random() * 60;
+        const angle  = Math.random() * Math.PI * 2;
+        const height = (Math.random() - 0.5) * 2.0;
+
+        pos[i * 3]     = Math.cos(angle) * radius;
+        pos[i * 3 + 1] = height;
+        pos[i * 3 + 2] = Math.sin(angle) * radius;
+
+        const speed = Math.sqrt(G * mass[0] / radius);
+        vel[i * 3]     = -Math.sin(angle) * speed;
+        vel[i * 3 + 1] = (Math.random() - 0.5) * speed * 0.1;
+        vel[i * 3 + 2] =  Math.cos(angle) * speed;
+
+        mass[i] = 1 + Math.random() * 20;
+
+        const pi = i - 1;
+        sizes[pi] = 2.0 + Math.random() * 2.5;
+
+        const c = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        colors[pi * 3] = c.r; colors[pi * 3 + 1] = c.g; colors[pi * 3 + 2] = c.b;
+
+        planetPos[pi * 3]     = pos[i * 3];
+        planetPos[pi * 3 + 1] = pos[i * 3 + 1];
+        planetPos[pi * 3 + 2] = pos[i * 3 + 2];
+      }
+
+      currentMasses = mass;
+
+      // Planet Points
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(planetPos, 3));
+      geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+      geo.setAttribute('size',     new THREE.BufferAttribute(sizes, 1));
+      planetPoints = new THREE.Points(geo, planetMaterial);
+      scene.add(planetPoints);
+
+      // Trails (planets only)
+      trailVertices = new Float32Array(numPlanets * numSegments * 2 * 3);
+      const trailColors = new Float32Array(numPlanets * numSegments * 2 * 4);
+
+      for (let p = 0; p < numPlanets; p++) {
+        const r = colors[p * 3], g = colors[p * 3 + 1], b = colors[p * 3 + 2];
+        for (let s = 0; s < numSegments; s++) {
+          const idx1 = (p * numSegments + s) * 2;
+          const idx2 = idx1 + 1;
+          const a1 = 1.0 - s / numSegments;
+          const a2 = 1.0 - (s + 1) / numSegments;
+          trailColors[idx1 * 4]     = r; trailColors[idx1 * 4 + 1] = g;
+          trailColors[idx1 * 4 + 2] = b; trailColors[idx1 * 4 + 3] = a1 * 0.4;
+          trailColors[idx2 * 4]     = r; trailColors[idx2 * 4 + 1] = g;
+          trailColors[idx2 * 4 + 2] = b; trailColors[idx2 * 4 + 3] = a2 * 0.4;
+        }
+      }
+
+      const trailGeo = new THREE.BufferGeometry();
+      trailGeo.setAttribute('position', new THREE.BufferAttribute(trailVertices, 3));
+      trailGeo.setAttribute('color',    new THREE.BufferAttribute(trailColors, 4));
+      trails = new THREE.LineSegments(trailGeo, new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }));
+      scene.add(trails);
+
+      // History ring-buffer
+      history = [];
+      for (let i = 0; i < TRAIL_LENGTH; i++) history.push(new Float32Array(pos));
+      historyIdx = 0;
+      isWorkerBusy = false;
+
+      gridMaterial.uniforms.u_G.value = G;
+      planetMaterial.uniforms.u_fov.value = camera.fov * Math.PI / 180.0;
+      planetMaterial.uniforms.u_viewportHeight.value = container.clientHeight * window.devicePixelRatio;
+
+      worker.postMessage({ type: 'init', pos: new Float32Array(pos), vel, mass, N, G, dt });
+    };
+
+    // ── Controls ────────────────────────────────────────────────────────
+    let state = { n: 10, g: 1.0, dt: 0.005 };
+    initSim(state.n, state.g, state.dt);
+
+    const controlsDiv = document.getElementById('gravity-controls');
+    if (controlsDiv) {
+      const elN  = document.getElementById('sim-n')  as HTMLInputElement;
+      const elG  = document.getElementById('sim-g')  as HTMLInputElement;
+      const elDt = document.getElementById('sim-dt') as HTMLInputElement;
+      const valN  = document.getElementById('val-n');
+      const valG  = document.getElementById('val-g');
+      const valDt = document.getElementById('val-dt');
+      const resetBtn = document.getElementById('sim-reset');
+
+      const updateLabels = () => {
+        if (valN)  valN.innerText  = elN.value;
+        if (valG)  valG.innerText  = elG.value;
+        if (valDt) valDt.innerText = elDt.value;
+      };
+
+      if (elN && elG && elDt && resetBtn) {
+        elN.addEventListener('input', updateLabels);
+        elG.addEventListener('input', updateLabels);
+        elDt.addEventListener('input', updateLabels);
+        resetBtn.addEventListener('click', () => {
+          state.n  = parseInt(elN.value);
+          state.g  = parseFloat(elG.value);
+          state.dt = parseFloat(elDt.value);
+          initSim(state.n, state.g, state.dt);
+        });
+      }
+    }
+
+    // ── Resize ──────────────────────────────────────────────────────────
+    window.addEventListener('resize', () => {
+      if (!container) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      planetMaterial.uniforms.u_viewportHeight.value = container.clientHeight * window.devicePixelRatio;
+    });
+
+    // ── Orbit controls (drag + zoom) ────────────────────────────────────
+    let isDragging = false;
+    let prevMouse = { x: 0, y: 0 };
+
+    container.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mouseup', () => isDragging = false);
+
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      camera.fov = Math.max(10, Math.min(100, camera.fov + e.deltaY * 0.05));
+      camera.updateProjectionMatrix();
+      planetMaterial.uniforms.u_fov.value = camera.fov * Math.PI / 180.0;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const dx = e.offsetX - prevMouse.x;
+        const dy = e.offsetY - prevMouse.y;
+        const spherical = new THREE.Spherical().setFromVector3(camera.position);
+        spherical.theta -= dx * 0.01;
+        spherical.phi   -= dy * 0.01;
+        spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 + 0.2, spherical.phi));
+        camera.position.setFromSpherical(spherical);
+        camera.lookAt(0, -10, 0);
+      }
+      prevMouse = { x: e.offsetX, y: e.offsetY };
+    });
+
+    // ── Render loop ─────────────────────────────────────────────────────
+    const animate = () => {
+      requestAnimationFrame(animate);
+      if (!isWorkerBusy) {
+        isWorkerBusy = true;
+        worker.postMessage({ type: 'step', steps: 1 });
+      }
+      renderer.render(scene, camera);
+    };
+    animate();
+  }
+</script>

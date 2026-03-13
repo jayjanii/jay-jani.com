@@ -1,0 +1,414 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { HOLD_COLORS, TAGS } from '../../lib/climbing';
+---
+
+<Layout title="Climbing Log - Jay Jani">
+  <div class="max-w-4xl mx-auto py-10 px-4">
+    <div class="flex items-center justify-between mb-8">
+      <a href="/" class="text-blue-400 hover:underline text-sm">&larr; Home</a>
+      <a href="/climbing/admin" class="text-gray-500 hover:text-gray-300 text-xs transition-colors">Admin</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-white mb-2">Climbing Log</h1>
+    <p class="text-gray-500 text-sm mb-8">Bouldering progress over time.</p>
+
+    <!-- ── Stats Bar ─────────────────────────────── -->
+    <div id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-total" class="text-2xl font-bold text-white">0</div>
+        <div class="text-gray-500 text-xs mt-1">Total Climbs</div>
+      </div>
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-high" class="text-2xl font-bold text-white">&ndash;</div>
+        <div class="text-gray-500 text-xs mt-1">Highest Grade</div>
+      </div>
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-avg" class="text-2xl font-bold text-white">&ndash;</div>
+        <div class="text-gray-500 text-xs mt-1">Average Grade</div>
+      </div>
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-trend" class="text-2xl font-bold text-white">&ndash;</div>
+        <div class="text-gray-500 text-xs mt-1">Trend</div>
+      </div>
+    </div>
+
+    <!-- ── Filters ───────────────────────────────── -->
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <div id="timescale-btns" class="flex gap-1">
+        {['1W','1M','3M','6M','1Y','All'].map(t => (
+          <button data-ts={t} class={`ts-btn px-3 py-1 rounded-full text-xs border transition-colors ${t === 'All' ? 'bg-blue-600/30 border-blue-500 text-blue-300' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>{t}</button>
+        ))}
+      </div>
+      <select id="filter-color" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-300">
+        <option value="">All Colors</option>
+        {HOLD_COLORS.map(c => <option value={c}>{c}</option>)}
+      </select>
+      <select id="filter-location" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-300">
+        <option value="">All Locations</option>
+      </select>
+    </div>
+
+    <div id="tag-filter" class="flex flex-wrap gap-1.5 mb-8">
+      <button data-ftag="" class="ftag-btn px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors">All Tags</button>
+      {TAGS.map(t => (
+        <button data-ftag={t} class="ftag-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">{t}</button>
+      ))}
+    </div>
+
+    <!-- ── Chart ─────────────────────────────────── -->
+    <div class="bg-gray-900/30 border border-gray-800 rounded-xl p-4 mb-10 relative">
+      <canvas id="climb-chart" class="w-full" style="height:350px"></canvas>
+      <!-- Custom tooltip rendered by JS -->
+      <div id="chart-tooltip" class="absolute z-30 pointer-events-none opacity-0 transition-opacity duration-150"></div>
+    </div>
+
+    <!-- ── Recent Climbs ─────────────────────────── -->
+    <div id="recent-section">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <h2 class="text-lg font-bold text-white">Recent Climbs</h2>
+        <div class="flex gap-1">
+          {['Recent','Oldest','Hardest','Easiest'].map(s => (
+            <button data-sort={s} class={`sort-btn px-3 py-1 rounded-full text-xs border transition-colors ${s === 'Recent' ? 'bg-blue-600/30 border-blue-500 text-blue-300' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>{s}</button>
+          ))}
+        </div>
+      </div>
+      <div id="climb-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      <div id="show-more-wrap" class="text-center mt-6 hidden">
+        <button id="btn-show-more" class="px-5 py-2 border border-gray-700 rounded-full text-xs text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">Show more</button>
+      </div>
+    </div>
+
+    <!-- ── Empty state ───────────────────────────── -->
+    <div id="empty-state" class="text-center py-16 hidden">
+      <p class="text-gray-500 text-sm mb-4">No climbs logged yet.</p>
+      <a href="/climbing/admin" class="text-blue-400 hover:underline text-sm">Add your first climb &rarr;</a>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { Chart, ScatterController, LineController, PointElement, LineElement, LinearScale, Tooltip, Legend } from 'chart.js';
+  import {
+    type ClimbingLog, GRADES, COLOR_HEX,
+    fetchLogs, gradeToNumber, numberToGrade, linearRegression,
+  } from '../../lib/climbing';
+
+  Chart.register(ScatterController, LineController, PointElement, LineElement, LinearScale, Tooltip, Legend);
+
+  const chartCanvas  = document.getElementById('climb-chart') as HTMLCanvasElement;
+  const tooltipEl    = document.getElementById('chart-tooltip') as HTMLDivElement;
+  const statTotal    = document.getElementById('stat-total')!;
+  const statHigh     = document.getElementById('stat-high')!;
+  const statAvg      = document.getElementById('stat-avg')!;
+  const statTrend    = document.getElementById('stat-trend')!;
+  const filterColor  = document.getElementById('filter-color') as HTMLSelectElement;
+  const filterLoc    = document.getElementById('filter-location') as HTMLSelectElement;
+  const emptyState   = document.getElementById('empty-state') as HTMLDivElement;
+  const recentSection = document.getElementById('recent-section') as HTMLDivElement;
+  const climbList    = document.getElementById('climb-list') as HTMLDivElement;
+  const showMoreWrap = document.getElementById('show-more-wrap') as HTMLDivElement;
+  const showMoreBtn  = document.getElementById('btn-show-more') as HTMLButtonElement;
+
+  let activeTimescale = 'All';
+  let activeColor = '';
+  let activeLocation = '';
+  let activeTag = '';
+  let activeSort = 'Recent';
+  let listLimit = 6;
+
+  // Shared filtered data used by both chart and list
+  let filteredLogs: ClimbingLog[] = [];
+
+  // ── Toggle helpers ──
+  function activateBtn(selector: string, attr: string, value: string) {
+    document.querySelectorAll<HTMLButtonElement>(selector).forEach(b => {
+      const on = b.getAttribute(attr) === value;
+      b.classList.toggle('bg-blue-600/30', on);
+      b.classList.toggle('border-blue-500', on);
+      b.classList.toggle('text-blue-300', on);
+      b.classList.toggle('border-gray-700', !on);
+      b.classList.toggle('text-gray-400', !on);
+    });
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.ts-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeTimescale = btn.dataset.ts!; activateBtn('.ts-btn', 'data-ts', activeTimescale); listLimit = 6; applyFilters(); })
+  );
+  document.querySelectorAll<HTMLButtonElement>('.ftag-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeTag = btn.dataset.ftag!; activateBtn('.ftag-btn', 'data-ftag', activeTag); listLimit = 6; applyFilters(); })
+  );
+  document.querySelectorAll<HTMLButtonElement>('.sort-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeSort = btn.dataset.sort!; activateBtn('.sort-btn', 'data-sort', activeSort); listLimit = 6; applyFilters(); })
+  );
+  filterColor.addEventListener('change', () => { activeColor = filterColor.value; listLimit = 6; applyFilters(); });
+  filterLoc.addEventListener('change', () => { activeLocation = filterLoc.value; listLimit = 6; applyFilters(); });
+  showMoreBtn.addEventListener('click', () => { listLimit += 6; renderList(); });
+
+  function cutoffDate(ts: string): number {
+    const now = Date.now();
+    const day = 86400000;
+    switch (ts) {
+      case '1W':  return now - 7 * day;
+      case '1M':  return now - 30 * day;
+      case '3M':  return now - 90 * day;
+      case '6M':  return now - 180 * day;
+      case '1Y':  return now - 365 * day;
+      default:    return 0;
+    }
+  }
+
+  // ── Custom external tooltip for chart hover ──
+  function externalTooltip(context: { chart: Chart; tooltip: any }) {
+    const { tooltip } = context;
+
+    if (tooltip.opacity === 0 || tooltip.dataPoints?.[0]?.datasetIndex !== 0) {
+      tooltipEl.style.opacity = '0';
+      return;
+    }
+
+    const dp = tooltip.dataPoints[0];
+    const log = filteredLogs[dp.dataIndex];
+    if (!log) { tooltipEl.style.opacity = '0'; return; }
+
+    const hex = COLOR_HEX[log.color] || '#888';
+    const dateStr = new Date(log.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    let imgHtml = '';
+    if (log.images.length) {
+      imgHtml = `<img src="${log.images[0]}" class="w-full max-h-40 object-cover rounded mt-2" />`;
+    }
+
+    tooltipEl.innerHTML = `
+      <div class="bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3 text-xs max-w-[220px]">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:${hex}"></span>
+          <span class="font-bold text-white">${log.grade}</span>
+          <span class="text-gray-500">${dateStr}</span>
+        </div>
+        ${log.location ? `<div class="text-gray-400 mb-1">${log.location}</div>` : ''}
+        ${log.tags.length ? `<div class="text-gray-500">${log.tags.join(', ')}</div>` : ''}
+        ${log.notes ? `<div class="text-gray-600 mt-1 italic">${log.notes}</div>` : ''}
+        ${imgHtml}
+      </div>
+    `;
+
+    const pos = context.chart.canvas.getBoundingClientRect();
+    const containerPos = context.chart.canvas.parentElement!.getBoundingClientRect();
+
+    const left = tooltip.caretX;
+    const top = tooltip.caretY;
+
+    tooltipEl.style.opacity = '1';
+    tooltipEl.style.left = left + 'px';
+    tooltipEl.style.top = top + 'px';
+    tooltipEl.style.transform = 'translate(-50%, calc(-100% - 12px))';
+  }
+
+  // ── Chart ──
+  let chart: Chart | null = null;
+
+  let allLogs: ClimbingLog[] = [];
+
+  async function render() {
+    allLogs = await fetchLogs();
+    applyFilters();
+  }
+
+  function applyFilters() {
+    // Populate location filter
+    const locs = [...new Set(allLogs.map(l => l.location).filter(Boolean))].sort();
+    const curLoc = filterLoc.value;
+    filterLoc.innerHTML = '<option value="">All Locations</option>' + locs.map(l => `<option value="${l}"${l === curLoc ? ' selected' : ''}>${l}</option>`).join('');
+
+    // Apply filters (date ascending for chart)
+    const cutoff = cutoffDate(activeTimescale);
+    filteredLogs = allLogs.filter(log => {
+      const ts = new Date(log.date + 'T00:00:00').getTime();
+      if (ts < cutoff) return false;
+      if (activeColor && log.color !== activeColor) return false;
+      if (activeLocation && log.location !== activeLocation) return false;
+      if (activeTag && !log.tags.includes(activeTag)) return false;
+      return true;
+    }).sort((a, b) => a.date.localeCompare(b.date));
+
+    const allEmpty = allLogs.length === 0;
+    emptyState.classList.toggle('hidden', !allEmpty);
+    document.getElementById('stats')!.classList.toggle('hidden', allEmpty);
+    recentSection.classList.toggle('hidden', allEmpty);
+
+    // Stats
+    if (filteredLogs.length > 0) {
+      const grades = filteredLogs.map(l => gradeToNumber(l.grade));
+      const max = Math.max(...grades);
+      const avg = grades.reduce((a, b) => a + b, 0) / grades.length;
+      statTotal.textContent = String(filteredLogs.length);
+      statHigh.textContent = numberToGrade(max);
+      statAvg.textContent = numberToGrade(Math.round(avg));
+
+      const reg = linearRegression(filteredLogs.map(l => ({
+        x: new Date(l.date + 'T00:00:00').getTime(),
+        y: gradeToNumber(l.grade),
+      })));
+      if (reg && reg.slope !== 0) {
+        const perMonth = reg.slope * 30 * 86400000;
+        const dir = perMonth > 0 ? '+' : '';
+        statTrend.textContent = `${dir}${perMonth.toFixed(2)} / mo`;
+        statTrend.className = `text-2xl font-bold ${perMonth > 0 ? 'text-green-400' : 'text-red-400'}`;
+      } else {
+        statTrend.textContent = '–';
+        statTrend.className = 'text-2xl font-bold text-white';
+      }
+    } else {
+      statTotal.textContent = '0';
+      statHigh.textContent = '–';
+      statAvg.textContent = '–';
+      statTrend.textContent = '–';
+      statTrend.className = 'text-2xl font-bold text-white';
+    }
+
+    // ── Chart data ──
+    const points = filteredLogs.map(l => ({
+      x: new Date(l.date + 'T00:00:00').getTime(),
+      y: gradeToNumber(l.grade),
+    }));
+    const bgColors = filteredLogs.map(l => COLOR_HEX[l.color] || '#888');
+
+    const datasets: any[] = [{
+      label: 'Climbs',
+      data: points,
+      backgroundColor: bgColors,
+      borderColor: bgColors.map(c => c + '88'),
+      pointRadius: 6,
+      pointHoverRadius: 9,
+    }];
+
+    if (points.length >= 2) {
+      const reg = linearRegression(points)!;
+      const xs = points.map(p => p.x);
+      const xMin = Math.min(...xs), xMax = Math.max(...xs);
+      datasets.push({
+        type: 'line' as const,
+        label: 'Trend',
+        data: [
+          { x: xMin, y: reg.slope * xMin + reg.intercept },
+          { x: xMax, y: reg.slope * xMax + reg.intercept },
+        ],
+        borderColor: 'rgba(96, 165, 250, 0.25)',
+        borderDash: [6, 4],
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+
+    const allGrades = filteredLogs.map(l => gradeToNumber(l.grade));
+    const yMin = allGrades.length ? Math.min(...allGrades) - 1 : -1;
+    const yMax = allGrades.length ? Math.max(...allGrades) + 1 : 6;
+
+    if (chart) chart.destroy();
+    chart = new Chart(chartCanvas, {
+      type: 'scatter',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: true },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false,
+            external: externalTooltip,
+          },
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: {
+              color: '#6b7280',
+              maxTicksLimit: 8,
+              callback: (val) => new Date(val as number).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            },
+          },
+          y: {
+            min: yMin,
+            max: yMax,
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: {
+              color: '#6b7280',
+              stepSize: 1,
+              callback: (val) => {
+                const n = val as number;
+                if (n < -1 || n > 17 || n !== Math.floor(n)) return '';
+                return numberToGrade(n);
+              },
+            },
+          },
+        },
+      },
+    });
+
+    renderList();
+  }
+
+  // ── Recent Climbs list ──
+  function renderList() {
+    const sorted = [...filteredLogs];
+
+    switch (activeSort) {
+      case 'Recent':  sorted.sort((a, b) => b.date.localeCompare(a.date)); break;
+      case 'Oldest':  sorted.sort((a, b) => a.date.localeCompare(b.date)); break;
+      case 'Hardest': sorted.sort((a, b) => gradeToNumber(b.grade) - gradeToNumber(a.grade)); break;
+      case 'Easiest': sorted.sort((a, b) => gradeToNumber(a.grade) - gradeToNumber(b.grade)); break;
+    }
+
+    const visible = sorted.slice(0, listLimit);
+    const hasMore = sorted.length > listLimit;
+    showMoreWrap.classList.toggle('hidden', !hasMore);
+
+    climbList.innerHTML = '';
+
+    if (sorted.length === 0) {
+      climbList.innerHTML = '<p class="text-gray-600 text-sm col-span-2">No climbs match the current filters.</p>';
+      return;
+    }
+
+    for (const log of visible) {
+      const hex = COLOR_HEX[log.color] || '#888';
+      const dateStr = new Date(log.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      const hasImg = log.images.length > 0;
+
+      const card = document.createElement('article');
+      card.className = 'bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden hover:bg-gray-900/60 transition-colors';
+
+      card.innerHTML = `
+        ${hasImg ? `
+          <div class="w-full aspect-[4/3] overflow-hidden bg-black">
+            <img src="${log.images[0]}" alt="${log.grade} climb" class="w-full h-full object-cover" />
+          </div>
+        ` : ''}
+        <div class="p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-block w-3 h-3 rounded-full shrink-0" style="background:${hex}"></span>
+            <span class="font-bold text-white text-sm">${log.grade}</span>
+            <span class="text-gray-500 text-xs ml-auto">${dateStr}</span>
+          </div>
+          ${log.location ? `<div class="text-gray-400 text-xs mb-2">${log.location}</div>` : ''}
+          ${log.tags.length ? `<div class="flex flex-wrap gap-1 mb-2">${log.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
+          ${log.notes ? `<p class="text-gray-500 text-xs">${log.notes}</p>` : ''}
+          ${log.images.length > 1 ? `
+            <div class="flex gap-2 mt-3">
+              ${log.images.slice(1).map(src => `<img src="${src}" alt="climb photo" class="w-16 h-16 object-cover rounded border border-gray-700" />`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      climbList.appendChild(card);
+    }
+  }
+
+  render();
+</script>
+

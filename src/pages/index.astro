@@ -1,11 +1,91 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="Jay Jani - Developer Portfolio">
+  
+  <div class="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+    
+    <!-- Profile Section -->
+    <section class="flex flex-col md:flex-row items-center md:items-start gap-8 mb-16">
+      <div class="w-32 h-32 rounded-full bg-gray-800 flex items-center justify-center text-4xl font-bold text-gray-400 shrink-0 border border-gray-700 shadow-lg overflow-hidden">
+        <span>JJ</span>
+      </div>
+      <div class="text-center md:text-left">
+        <h1 class="text-4xl font-bold text-white tracking-tight mb-2">Jay Jani</h1>
+        <p class="text-xl text-gray-400 mb-4">Aspiring AI/ML Engineer</p>
+        <div class="flex items-center justify-center md:justify-start gap-2 text-gray-500 mb-4">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
+          <span>Computer Science @ UCSC</span>
+        </div>
+        <div class="flex flex-col items-center md:items-start gap-1 mb-4">
+          <button data-copy="contact@jay-jani.com" class="copy-email text-blue-400 hover:text-blue-300 transition-colors text-sm cursor-pointer">contact@jay-jani.com</button>
+          <button data-copy="jdjani@ucsc.edu" class="copy-email text-blue-400 hover:text-blue-300 transition-colors text-sm cursor-pointer">jdjani@ucsc.edu</button>
+        </div>
+        <div class="flex items-center justify-center md:justify-start gap-4">
+          <a href="https://github.com/jayjanii" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">GitHub</a>
+          <a href="/climbing" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">Climbing Log</a>
+        </div>
+      </div>
+    </section>
+
+    <hr class="border-gray-800 my-12" />
+
+    <!-- Projects Section -->
+    <section>
+      <h2 class="text-2xl font-bold mb-8 text-white">Projects</h2>
+
+      <div class="space-y-12">
+        
+        <!-- N-Body Simulation Project -->
+        <article class="group relative bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:bg-gray-900/60 transition-colors">
+          <h3 class="text-xl font-bold mb-3 text-white">
+            N-Body Gravitational Simulator
+          </h3>
+          <p class="text-gray-400 leading-relaxed mb-4 text-sm">
+            Real-time N-body gravitational simulation built with OpenGL 3.3 Core Profile. Uses a symplectic Velocity Verlet integrator for long-term energy conservation. The Solar System scenario uses real J2000 Keplerian orbital elements for accurate elliptical orbits with true 3D inclinations.
+          </p>
+          
+          <div class="flex gap-4 text-sm">
+            <a href="/nbody" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+              View Web Demo
+            </a>
+            <a href="https://github.com/jayjanii/n-body-sim" target="_blank" class="inline-flex items-center gap-1 text-gray-400 hover:text-gray-300 hover:underline">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
+              GitHub Source
+            </a>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Copy toast -->
+  <div id="copy-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-700 text-gray-200 text-xs font-mono px-4 py-2 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+    Copied to clipboard
+  </div>
 </Layout>
+
+<script>
+  let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  document.querySelectorAll<HTMLButtonElement>('.copy-email').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const email = btn.dataset.copy ?? '';
+      navigator.clipboard.writeText(email).then(() => {
+        const toast = document.getElementById('copy-toast')!;
+        toast.textContent = `Copied ${email}`;
+        toast.classList.remove('opacity-0');
+        toast.classList.add('opacity-100');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.remove('opacity-100');
+          toast.classList.add('opacity-0');
+        }, 2000);
+      });
+    });
+  });
+</script>

@@ -1,0 +1,28 @@
+---
+import Layout from '../layouts/Layout.astro';
+import GravitySim from '../components/GravitySim.astro';
+---
+
+<Layout title="N-Body Simulation - Jay Jani">
+  <section class="mb-8">
+    <a href="/" class="text-blue-400 hover:underline mb-4 inline-block">&larr; Back to Home</a>
+    <h1 class="text-3xl font-bold mb-2 text-white">N-Body Gravitational Simulator</h1>
+    <p class="text-gray-400">
+      A high-performance, real-time N-body gravitational simulation running entirely in the browser using Three.js and WebWorkers. Offloading the O(N&sup2;) physics calculations to a WebWorker keeps the main thread unblocked, ensuring a smooth 60fps framerate.
+    </p>
+  </section>
+
+  <section class="mb-12">
+    <GravitySim controls={true} />
+  </section>
+
+  <section class="text-gray-400 leading-relaxed space-y-4">
+    <h2 class="text-xl font-bold text-white">How it works</h2>
+    <p>
+      This simulation uses a <strong>Symplectic Velocity Verlet</strong> integrator. Unlike basic Euler integration, Velocity Verlet preserves the Hamiltonian (total energy) of the system over long periods, allowing stable elliptical orbits to form.
+    </p>
+    <p>
+      The stars (particles) are drawn using an <code>AdditiveBlending</code> material with a custom radial gradient, creating a bloom effect as multiple bodies overlap. Fading orbital paths are maintained via line segments updated each frame.
+    </p>
+  </section>
+</Layout>

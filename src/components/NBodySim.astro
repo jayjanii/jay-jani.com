@@ -1,0 +1,177 @@
+<div id="nbody-container" class="w-full h-[400px] bg-black border border-gray-800 rounded mt-4 mb-6 relative overflow-hidden group cursor-pointer">
+  <div class="absolute inset-0 pointer-events-none z-10 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]"></div>
+  <div class="absolute bottom-3 right-3 text-[10px] text-gray-500 font-mono z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+    Interactive N-Body Sim (Three.js)
+  </div>
+</div>
+
+<script>
+  import * as THREE from 'three';
+
+  class NBodySimulation {
+    container: HTMLElement;
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    renderer: THREE.WebGLRenderer;
+    bodies: Array<{mesh: THREE.Mesh, mass: number, vel: THREE.Vector3, trail?: THREE.Line, trailPositions?: Float32Array, trailIdx?: number}> = [];
+    animationId: number = 0;
+    
+    constructor(containerId: string) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      this.container = el;
+
+      this.scene = new THREE.Scene();
+      
+      this.camera = new THREE.PerspectiveCamera(60, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
+      this.camera.position.set(0, 15, 25);
+      this.camera.lookAt(0, 0, 0);
+
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+      this.renderer.setPixelRatio(window.devicePixelRatio);
+      this.container.appendChild(this.renderer.domElement);
+
+      this.initBodies();
+      this.bindEvents();
+      this.animate();
+    }
+
+    initBodies() {
+      const G = 1.0;
+      const starGeometry = new THREE.SphereGeometry(1.2, 32, 32);
+      const planetGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+      
+      // Star material with emission
+      const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc88 });
+      const star = new THREE.Mesh(starGeometry, starMaterial);
+      this.scene.add(star);
+      this.bodies.push({ mesh: star, mass: 500, vel: new THREE.Vector3(0,0,0) });
+
+      // Add simple PointLight
+      const light = new THREE.PointLight(0xffcc88, 2, 100);
+      this.scene.add(light);
+      this.scene.add(new THREE.AmbientLight(0x222222));
+
+      // Planets
+      const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffaa00, 0xaa44ff];
+      for (let i = 0; i < 5; i++) {
+        const mat = new THREE.MeshPhongMaterial({ 
+          color: colors[i],
+          shininess: 100
+        });
+        const planet = new THREE.Mesh(planetGeometry, mat);
+        
+        const distance = 6 + i * 3.5;
+        const angle = Math.random() * Math.PI * 2;
+        planet.position.set(Math.cos(angle) * distance, (Math.random()-0.5)*2, Math.sin(angle) * distance);
+        
+        // Circular orbit velocity
+        const speed = Math.sqrt(G * 500 / distance);
+        const vel = new THREE.Vector3(-Math.sin(angle) * speed, 0, Math.cos(angle) * speed);
+        
+        // Trail
+        const maxTrail = 100;
+        const trailPositions = new Float32Array(maxTrail * 3);
+        const trailGeo = new THREE.BufferGeometry();
+        trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+        const trailMat = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.5 });
+        const trail = new THREE.Line(trailGeo, trailMat);
+        this.scene.add(trail);
+
+        this.scene.add(planet);
+        this.bodies.push({ 
+          mesh: planet, 
+          mass: 1, 
+          vel: vel,
+          trail: trail,
+          trailPositions: trailPositions,
+          trailIdx: 0
+        });
+      }
+    }
+
+    bindEvents() {
+      window.addEventListener('resize', () => {
+        if (!this.container) return;
+        this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+      });
+
+      // Simple interactivity
+      let isDragging = false;
+      let previousMousePosition = { x: 0, y: 0 };
+      
+      this.container.addEventListener('mousedown', () => isDragging = true);
+      window.addEventListener('mouseup', () => isDragging = false);
+      window.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const deltaMove = { x: e.offsetX - previousMousePosition.x, y: e.offsetY - previousMousePosition.y };
+          
+          const spherical = new THREE.Spherical().setFromVector3(this.camera.position);
+          spherical.theta -= deltaMove.x * 0.01;
+          spherical.phi -= deltaMove.y * 0.01;
+          spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+          
+          this.camera.position.setFromSpherical(spherical);
+          this.camera.lookAt(0, 0, 0);
+        }
+        previousMousePosition = { x: e.offsetX, y: e.offsetY };
+      });
+    }
+
+    animate = () => {
+      this.animationId = requestAnimationFrame(this.animate);
+      
+      const dt = 0.016; // fixed dt for stability
+      const G = 1.0;
+
+      // Calculate forces
+      const forces = this.bodies.map(() => new THREE.Vector3());
+      
+      for (let i = 0; i < this.bodies.length; i++) {
+        for (let j = 0; j < this.bodies.length; j++) {
+          if (i === j) continue;
+          const dir = new THREE.Vector3().subVectors(this.bodies[j].mesh.position, this.bodies[i].mesh.position);
+          const distSq = dir.lengthSq();
+          if (distSq < 0.5) continue; 
+          
+          const fMag = (G * this.bodies[i].mass * this.bodies[j].mass) / distSq;
+          dir.normalize().multiplyScalar(fMag);
+          forces[i].add(dir);
+        }
+      }
+
+      // Update velocities and positions
+      for (let i = 0; i < this.bodies.length; i++) {
+        const acc = forces[i].clone().divideScalar(this.bodies[i].mass);
+        this.bodies[i].vel.add(acc.multiplyScalar(dt));
+        this.bodies[i].mesh.position.add(this.bodies[i].vel.clone().multiplyScalar(dt));
+
+        // Update trails
+        if (this.bodies[i].trail && this.bodies[i].trailPositions) {
+          const pos = this.bodies[i].mesh.position;
+          const idx = this.bodies[i].trailIdx!;
+          const arr = this.bodies[i].trailPositions!;
+          
+          arr[idx * 3] = pos.x;
+          arr[idx * 3 + 1] = pos.y;
+          arr[idx * 3 + 2] = pos.z;
+          
+          this.bodies[i].trail!.geometry.attributes.position.needsUpdate = true;
+          this.bodies[i].trail!.geometry.setDrawRange(0, 100);
+          
+          this.bodies[i].trailIdx = (idx + 1) % 100;
+        }
+      }
+
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  // Initialize on load
+  document.addEventListener('DOMContentLoaded', () => {
+    new NBodySimulation('nbody-container');
+  });
+</script>
