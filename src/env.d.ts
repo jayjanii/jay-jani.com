@@ -1,12 +1,12 @@
 /// <reference path="../.astro/types.d.ts" />
 
-interface Env {
+// Cloudflare Workers env bindings used via `import { env } from "cloudflare:workers"`
+interface CloudflareEnv {
   DB: D1Database;
   ADMIN_PASSWORD: string;
 }
 
-type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
-
-declare namespace App {
-  interface Locals extends Runtime {}
+declare module 'cloudflare:workers' {
+  const env: CloudflareEnv;
+  export { env };
 }

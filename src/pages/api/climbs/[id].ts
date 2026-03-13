@@ -1,14 +1,14 @@
 import type { APIRoute } from 'astro';
+import { env } from 'cloudflare:workers';
 
 export const prerender = false;
 
 function checkAuth(request: Request, password: string): boolean {
-  const h = request.headers.get('Authorization');
-  return h === `Bearer ${password}`;
+  return request.headers.get('Authorization') === `Bearer ${password}`;
 }
 
-export const PUT: APIRoute = async ({ params, request, locals }) => {
-  const { DB, ADMIN_PASSWORD } = locals.runtime.env;
+export const PUT: APIRoute = async ({ params, request }) => {
+  const { DB, ADMIN_PASSWORD } = env as unknown as { DB: D1Database; ADMIN_PASSWORD: string };
   if (!checkAuth(request, ADMIN_PASSWORD)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
@@ -33,8 +33,8 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   });
 };
 
-export const DELETE: APIRoute = async ({ params, request, locals }) => {
-  const { DB, ADMIN_PASSWORD } = locals.runtime.env;
+export const DELETE: APIRoute = async ({ params, request }) => {
+  const { DB, ADMIN_PASSWORD } = env as unknown as { DB: D1Database; ADMIN_PASSWORD: string };
   if (!checkAuth(request, ADMIN_PASSWORD)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }

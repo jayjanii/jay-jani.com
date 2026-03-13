@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro';
+import { env } from 'cloudflare:workers';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  const { ADMIN_PASSWORD } = locals.runtime.env;
+export const POST: APIRoute = async ({ request }) => {
+  const { ADMIN_PASSWORD } = env as unknown as { ADMIN_PASSWORD: string };
   const body = await request.json() as { password?: string };
 
   if (!body.password || body.password !== ADMIN_PASSWORD) {

@@ -1,15 +1,15 @@
 import type { APIRoute } from 'astro';
+import { env } from 'cloudflare:workers';
 
 export const prerender = false;
 
 function checkAuth(request: Request, password: string): boolean {
-  const h = request.headers.get('Authorization');
-  return h === `Bearer ${password}`;
+  return request.headers.get('Authorization') === `Bearer ${password}`;
 }
 
-export const GET: APIRoute = async ({ locals }) => {
-  const db = locals.runtime.env.DB;
-  const { results } = await db.prepare('SELECT * FROM climbs ORDER BY date DESC').all();
+export const GET: APIRoute = async () => {
+  const { DB } = env as unknown as { DB: D1Database };
+  const { results } = await DB.prepare('SELECT * FROM climbs ORDER BY date DESC').all();
 
   const logs = (results ?? []).map((r: any) => ({
     id: r.id,
@@ -27,8 +27,8 @@ export const GET: APIRoute = async ({ locals }) => {
   });
 };
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  const { DB, ADMIN_PASSWORD } = locals.runtime.env;
+export const POST: APIRoute = async ({ request }) => {
+  const { DB, ADMIN_PASSWORD } = env as unknown as { DB: D1Database; ADMIN_PASSWORD: string };
   if (!checkAuth(request, ADMIN_PASSWORD)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
