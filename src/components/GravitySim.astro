@@ -7,7 +7,7 @@ const { controls = false } = Astro.props;
 ---
 
 <div class="flex flex-col w-full">
-  <div id="gravity-sim-container" class="w-full h-[500px] relative overflow-hidden rounded border border-gray-800 bg-transparent mt-4 cursor-pointer">
+  <div id="gravity-sim-container" class="w-full h-[500px] relative overflow-hidden rounded border border-gray-800 bg-transparent mt-4 cursor-pointer" style="touch-action: none;">
     <canvas id="gravity-canvas" class="block w-full h-full bg-transparent"></canvas>
     <div class="absolute top-3 right-3 text-[10px] text-gray-500 font-mono z-20 pointer-events-none">
       (Drag to Rotate | Scroll to Zoom)
@@ -713,32 +713,73 @@ const { controls = false } = Astro.props;
       planetMaterial.uniforms.u_viewportHeight.value = container.clientHeight * window.devicePixelRatio;
     });
 
-    // ── Orbit controls (drag + zoom) ────────────────────────────────────
-    let isDragging = false;
-    let prevMouse = { x: 0, y: 0 };
+    // ── Orbit controls (pointer rotate + wheel/pinch zoom) ───────────────
+    const activePointers = new Map<number, { x: number; y: number }>();
+    let lastPinchDist: number | null = null;
 
-    container.addEventListener('mousedown', () => isDragging = true);
-    window.addEventListener('mouseup', () => isDragging = false);
+    const getOffsetPos = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
 
-    container.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      camera.fov = Math.max(10, Math.min(100, camera.fov + e.deltaY * 0.05));
-      camera.updateProjectionMatrix();
-      planetMaterial.uniforms.u_fov.value = camera.fov * Math.PI / 180.0;
+    container.addEventListener('pointerdown', (e) => {
+      container.setPointerCapture(e.pointerId);
+      activePointers.set(e.pointerId, getOffsetPos(e));
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      }
     });
 
-    window.addEventListener('mousemove', (e) => {
-      if (isDragging) {
-        const dx = e.offsetX - prevMouse.x;
-        const dy = e.offsetY - prevMouse.y;
+    const endPointer = (e: PointerEvent) => {
+      activePointers.delete(e.pointerId);
+      if (activePointers.size < 2) lastPinchDist = null;
+    };
+    container.addEventListener('pointerup', endPointer);
+    container.addEventListener('pointercancel', endPointer);
+
+    container.addEventListener('pointermove', (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      const prev = activePointers.get(e.pointerId)!;
+      const curr = getOffsetPos(e);
+      activePointers.set(e.pointerId, curr);
+
+      // One-finger drag → rotate
+      if (activePointers.size === 1) {
+        e.preventDefault();
+        const dx = curr.x - prev.x;
+        const dy = curr.y - prev.y;
         const spherical = new THREE.Spherical().setFromVector3(camera.position);
         spherical.theta -= dx * 0.01;
         spherical.phi   -= dy * 0.01;
         spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 + 0.2, spherical.phi));
         camera.position.setFromSpherical(spherical);
         camera.lookAt(0, -10, 0);
+        return;
       }
-      prevMouse = { x: e.offsetX, y: e.offsetY };
+
+      // Two-finger pinch → zoom (adjust FOV)
+      if (activePointers.size === 2) {
+        e.preventDefault();
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (lastPinchDist != null && dist > 0) {
+          const ratio = lastPinchDist / dist; // >1 means pinching in
+          const delta = (ratio - 1) * 40; // tune sensitivity
+          camera.fov = Math.max(10, Math.min(100, camera.fov + delta));
+          camera.updateProjectionMatrix();
+          planetMaterial.uniforms.u_fov.value = camera.fov * Math.PI / 180.0;
+        }
+        lastPinchDist = dist;
+      }
+    }, { passive: false });
+
+    // Wheel zoom for desktop trackpads/mouse
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      camera.fov = Math.max(10, Math.min(100, camera.fov + e.deltaY * 0.05));
+      camera.updateProjectionMatrix();
+      planetMaterial.uniforms.u_fov.value = camera.fov * Math.PI / 180.0;
     });
 
     // ── Render loop ─────────────────────────────────────────────────────
