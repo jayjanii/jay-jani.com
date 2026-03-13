@@ -79,6 +79,20 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
       </div>
     </div>
 
+    <!-- ── Image preview modal ───────────────────── -->
+    <div id="img-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+      <button id="img-modal-backdrop" class="absolute inset-0 bg-black/80" aria-label="Close image preview"></button>
+      <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl">
+          <button id="img-modal-close" class="absolute -top-10 right-0 text-gray-200 hover:text-white text-sm px-3 py-1 rounded bg-gray-900/60 border border-gray-700" type="button">
+            Close (Esc)
+          </button>
+          <img id="img-modal-img" src="" alt="" class="w-full max-h-[80vh] object-contain rounded-xl border border-gray-800 bg-black" />
+          <div id="img-modal-caption" class="mt-2 text-xs text-gray-400 text-center"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Empty state ───────────────────────────── -->
     <div id="empty-state" class="text-center py-16 hidden">
       <p class="text-gray-500 text-sm mb-4">No climbs logged yet.</p>
@@ -110,6 +124,12 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
   const showMoreWrap = document.getElementById('show-more-wrap') as HTMLDivElement;
   const showMoreBtn  = document.getElementById('btn-show-more') as HTMLButtonElement;
 
+  const imgModal = document.getElementById('img-modal') as HTMLDivElement;
+  const imgModalBackdrop = document.getElementById('img-modal-backdrop') as HTMLButtonElement;
+  const imgModalClose = document.getElementById('img-modal-close') as HTMLButtonElement;
+  const imgModalImg = document.getElementById('img-modal-img') as HTMLImageElement;
+  const imgModalCaption = document.getElementById('img-modal-caption') as HTMLDivElement;
+
   let activeTimescale = 'All';
   let activeColor = '';
   let activeLocation = '';
@@ -119,6 +139,33 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
 
   // Shared filtered data used by both chart and list
   let filteredLogs: ClimbingLog[] = [];
+
+  // ── Image preview modal ──
+  let lastFocusEl: HTMLElement | null = null;
+  function openImgModal(src: string, alt: string, caption?: string) {
+    lastFocusEl = document.activeElement as HTMLElement | null;
+    imgModalImg.src = src;
+    imgModalImg.alt = alt || 'Climb photo';
+    imgModalCaption.textContent = caption || '';
+    imgModal.classList.remove('hidden');
+    imgModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    imgModalClose.focus();
+  }
+  function closeImgModal() {
+    imgModal.classList.add('hidden');
+    imgModal.setAttribute('aria-hidden', 'true');
+    imgModalImg.src = '';
+    imgModalImg.alt = '';
+    imgModalCaption.textContent = '';
+    document.body.style.overflow = '';
+    lastFocusEl?.focus?.();
+  }
+  imgModalBackdrop.addEventListener('click', closeImgModal);
+  imgModalClose.addEventListener('click', closeImgModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !imgModal.classList.contains('hidden')) closeImgModal();
+  });
 
   // ── Toggle helpers ──
   function activateBtn(selector: string, attr: string, value: string) {
@@ -385,7 +432,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
       card.innerHTML = `
         ${hasImg ? `
           <div class="w-full aspect-[4/3] overflow-hidden bg-black">
-            <img src="${log.images[0]}" alt="${log.grade} climb" class="w-full h-full object-cover" />
+            <img data-preview-src="${log.images[0]}" data-preview-alt="${log.grade} climb" data-preview-caption="${dateStr}${log.location ? ' • ' + log.location : ''}" src="${log.images[0]}" alt="${log.grade} climb" class="w-full h-full object-cover cursor-zoom-in" />
           </div>
         ` : ''}
         <div class="p-4">
@@ -399,7 +446,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
           ${log.notes ? `<p class="text-gray-500 text-xs">${log.notes}</p>` : ''}
           ${log.images.length > 1 ? `
             <div class="flex gap-2 mt-3">
-              ${log.images.slice(1).map(src => `<img src="${src}" alt="climb photo" class="w-16 h-16 object-cover rounded border border-gray-700" />`).join('')}
+              ${log.images.slice(1).map(src => `<img data-preview-src="${src}" data-preview-alt="climb photo" data-preview-caption="${dateStr}${log.location ? ' • ' + log.location : ''}" src="${src}" alt="climb photo" class="w-16 h-16 object-cover rounded border border-gray-700 cursor-zoom-in" />`).join('')}
             </div>
           ` : ''}
         </div>
@@ -408,6 +455,17 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
       climbList.appendChild(card);
     }
   }
+
+  // Event delegation: click any previewable image
+  climbList.addEventListener('click', (e) => {
+    const el = e.target as HTMLElement | null;
+    const img = el?.closest('img[data-preview-src]') as HTMLImageElement | null;
+    if (!img) return;
+    const src = img.getAttribute('data-preview-src') || img.src;
+    const alt = img.getAttribute('data-preview-alt') || img.alt || 'Climb photo';
+    const caption = img.getAttribute('data-preview-caption') || '';
+    openImgModal(src, alt, caption);
+  });
 
   render();
 </script>
