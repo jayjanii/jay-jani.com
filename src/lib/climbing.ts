@@ -26,6 +26,7 @@ export const TAGS = [
   'Crimps','Jugs','Slopers','Pinches','Pockets',
   'Dyno','Slab','Overhang','Roof','Mantle',
   'Heel Hook','Toe Hook','Crack','Arete','Compression',
+  'Smear','Stem','Knee Bar','Comp',
 ];
 
 export const COLOR_HEX: Record<string, string> = {

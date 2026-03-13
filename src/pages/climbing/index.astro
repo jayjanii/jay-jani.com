@@ -47,6 +47,27 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
       <select id="filter-location" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-300">
         <option value="">All Locations</option>
       </select>
+      <!-- Grade multi-select checkbox dropdown -->
+      <div class="relative" id="grade-filter-wrap">
+        <button id="grade-filter-btn" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500 transition-colors flex items-center gap-1.5">
+          <span id="grade-filter-label">Grade</span>
+          <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <div id="grade-panel" class="absolute left-0 top-full mt-1 hidden z-20 bg-gray-900 border border-gray-700 rounded-xl p-3 shadow-xl min-w-[200px]">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] text-gray-500 uppercase tracking-wider">Filter by grade</span>
+            <button id="grade-clear-btn" class="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Clear</button>
+          </div>
+          <div class="grid grid-cols-4 gap-1">
+            {['VB','V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13','V14','V15','V16','V17'].map(g => (
+              <label class="grade-checkbox-label flex items-center justify-center px-2 py-1 rounded border border-gray-700 text-xs text-gray-400 cursor-pointer hover:border-gray-500 transition-colors has-[:checked]:bg-blue-600/30 has-[:checked]:border-blue-500 has-[:checked]:text-blue-300">
+                <input type="checkbox" class="grade-cb sr-only" value={g} />
+                {g}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="tag-filter" class="flex flex-wrap gap-1.5 mb-8">
@@ -136,6 +157,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
   let activeTag = '';
   let activeSort = 'Recent';
   let listLimit = 6;
+  let activeGrades = new Set<string>();
 
   // Shared filtered data used by both chart and list
   let filteredLogs: ClimbingLog[] = [];
@@ -191,6 +213,50 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
   filterColor.addEventListener('change', () => { activeColor = filterColor.value; listLimit = 6; applyFilters(); });
   filterLoc.addEventListener('change', () => { activeLocation = filterLoc.value; listLimit = 6; applyFilters(); });
   showMoreBtn.addEventListener('click', () => { listLimit += 6; renderList(); });
+
+  // ── Grade filter dropdown ──
+  const gradeFilterBtn  = document.getElementById('grade-filter-btn') as HTMLButtonElement;
+  const gradePanel      = document.getElementById('grade-panel') as HTMLDivElement;
+  const gradeFilterWrap = document.getElementById('grade-filter-wrap') as HTMLDivElement;
+  const gradeFilterLabel = document.getElementById('grade-filter-label') as HTMLSpanElement;
+  const gradeClearBtn   = document.getElementById('grade-clear-btn') as HTMLButtonElement;
+
+  function updateGradeLabel() {
+    gradeFilterLabel.textContent = activeGrades.size > 0 ? `Grade (${activeGrades.size})` : 'Grade';
+    gradeFilterBtn.classList.toggle('border-blue-500', activeGrades.size > 0);
+    gradeFilterBtn.classList.toggle('text-blue-300', activeGrades.size > 0);
+    gradeFilterBtn.classList.toggle('border-gray-700', activeGrades.size === 0);
+    gradeFilterBtn.classList.toggle('text-gray-300', activeGrades.size === 0);
+  }
+
+  gradeFilterBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    gradePanel.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!gradeFilterWrap.contains(e.target as Node)) {
+      gradePanel.classList.add('hidden');
+    }
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.grade-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) activeGrades.add(cb.value);
+      else activeGrades.delete(cb.value);
+      updateGradeLabel();
+      listLimit = 6;
+      applyFilters();
+    });
+  });
+
+  gradeClearBtn.addEventListener('click', () => {
+    activeGrades.clear();
+    document.querySelectorAll<HTMLInputElement>('.grade-cb').forEach(cb => { cb.checked = false; });
+    updateGradeLabel();
+    listLimit = 6;
+    applyFilters();
+  });
 
   function cutoffDate(ts: string): number {
     const now = Date.now();
@@ -276,6 +342,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
       if (activeColor && log.color !== activeColor) return false;
       if (activeLocation && log.location !== activeLocation) return false;
       if (activeTag && !log.tags.includes(activeTag)) return false;
+      if (activeGrades.size > 0 && !activeGrades.has(log.grade)) return false;
       return true;
     }).sort((a, b) => a.date.localeCompare(b.date));
 
