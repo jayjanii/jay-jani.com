@@ -15,25 +15,32 @@ const { controls = false } = Astro.props;
   </div>
 
   {controls && (
-    <div id="gravity-controls" class="flex flex-col md:flex-row gap-6 mt-6 p-4 border border-gray-800 rounded bg-gray-900/30 text-sm">
-      <div class="flex flex-col gap-2 flex-1">
-        <label class="flex justify-between text-gray-300">
-          <span>Bodies (<span id="val-n">10</span>)</span>
-          <input type="range" id="sim-n" min="2" max="100" step="1" value="10" class="w-1/2 accent-blue-500" />
-        </label>
-        <label class="flex justify-between text-gray-300">
-          <span>Gravity G (<span id="val-g">1.0</span>)</span>
-          <input type="range" id="sim-g" min="0.1" max="5.0" step="0.1" value="1.0" class="w-1/2 accent-blue-500" />
-        </label>
-        <label class="flex justify-between text-gray-300">
-          <span>Time Step dt (<span id="val-dt">0.005</span>)</span>
-          <input type="range" id="sim-dt" min="0.001" max="0.02" step="0.001" value="0.005" class="w-1/2 accent-blue-500" />
-        </label>
+    <div id="gravity-controls" class="flex flex-col gap-4 mt-6 p-4 border border-gray-800 rounded bg-gray-900/30 text-sm">
+      <div id="scenario-buttons" class="flex flex-wrap gap-2">
+        <button class="scenario-btn px-4 py-1.5 rounded border text-xs font-medium transition-colors border-blue-500 bg-blue-500/10 text-blue-400" data-scenario="custom">Custom</button>
+        <button class="scenario-btn px-4 py-1.5 rounded border text-xs font-medium transition-colors border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200" data-scenario="orthogonal">4-Body Orthogonal Binaries</button>
+        <button class="scenario-btn px-4 py-1.5 rounded border text-xs font-medium transition-colors border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200" data-scenario="solar">Solar System</button>
       </div>
-      <div class="flex items-center">
-        <button id="sim-reset" class="px-6 py-2 bg-gray-200 text-black font-bold rounded hover:bg-white transition-colors w-full md:w-auto">
-          Reset Simulation
-        </button>
+      <div id="custom-controls" class="flex flex-col md:flex-row gap-6">
+        <div class="flex flex-col gap-2 flex-1">
+          <label class="flex justify-between text-gray-300">
+            <span>Bodies (<span id="val-n">10</span>)</span>
+            <input type="range" id="sim-n" min="2" max="100" step="1" value="10" class="w-1/2 accent-blue-500" />
+          </label>
+          <label class="flex justify-between text-gray-300">
+            <span>Gravity G (<span id="val-g">1.0</span>)</span>
+            <input type="range" id="sim-g" min="0.1" max="5.0" step="0.1" value="1.0" class="w-1/2 accent-blue-500" />
+          </label>
+          <label class="flex justify-between text-gray-300">
+            <span>Time Step dt (<span id="val-dt">0.005</span>)</span>
+            <input type="range" id="sim-dt" min="0.001" max="0.02" step="0.001" value="0.005" class="w-1/2 accent-blue-500" />
+          </label>
+        </div>
+        <div class="flex items-center">
+          <button id="sim-reset" class="px-6 py-2 bg-gray-200 text-black font-bold rounded hover:bg-white transition-colors w-full md:w-auto">
+            Reset Simulation
+          </button>
+        </div>
       </div>
     </div>
   )}
@@ -65,6 +72,10 @@ const { controls = false } = Astro.props;
     let trailVertices: Float32Array;
     let currentMasses: Float32Array;
     let currentN = 10;
+    let currentBodyOffset = 1;
+    let currentShowSun = true;
+    let currentStepsPerFrame = 1;
+    let orthTime = 0;
 
     // ── Spacetime Grid ──────────────────────────────────────────────────
     const gridUniforms = {
@@ -212,12 +223,9 @@ const { controls = false } = Astro.props;
           vec4 worldPos = modelMatrix * vec4(position, 1.0);
           vec4 mvPosition = viewMatrix * worldPos;
 
-          // Light direction toward sun, transformed into view space so it
-          // lines up with the billboard-normal we compute in the fragment shader.
           vec3 lightDir_world = normalize(u_sunPos - worldPos.xyz);
           vLightDirView = normalize((viewMatrix * vec4(lightDir_world, 0.0)).xyz);
 
-          // Perspective-correct sizing: scales naturally with FOV zoom
           float projScale = u_viewportHeight / (2.0 * tan(u_fov * 0.5));
           gl_PointSize = clamp(size * projScale / -mvPosition.z, 2.0, 256.0);
 
@@ -234,14 +242,11 @@ const { controls = false } = Astro.props;
           float r2 = dot(coord, coord);
           if (r2 > 1.0) discard;
 
-          // Fake sphere normal (billboard faces camera → view-space)
           float z = sqrt(1.0 - r2);
           vec3 normal = vec3(coord.x, -coord.y, z);
 
-          // Diffuse
           float diff = max(0.0, dot(normal, vLightDirView));
 
-          // Blinn-Phong specular
           vec3 viewDir = vec3(0.0, 0.0, 1.0);
           vec3 halfDir = normalize(vLightDirView + viewDir);
           float spec = pow(max(dot(normal, halfDir), 0.0), 40.0);
@@ -262,6 +267,7 @@ const { controls = false } = Astro.props;
       let pos, vel, mass, acc;
       let N, G, dt;
       let softeningSq = 1.0;
+      let pinCenter = true;
 
       function computeAccelerations() {
         for (let i = 0; i < N * 3; i++) acc[i] = 0;
@@ -297,6 +303,7 @@ const { controls = false } = Astro.props;
           N    = e.data.N;
           G    = e.data.G;
           dt   = e.data.dt;
+          pinCenter = !!e.data.pinCenter;
           acc  = new Float32Array(N * 3);
           computeAccelerations();
         } else if (e.data.type === 'step') {
@@ -306,9 +313,10 @@ const { controls = false } = Astro.props;
               vel[i] += 0.5 * acc[i] * dt;
               pos[i] += vel[i] * dt;
             }
-            // Pin central star at origin
-            pos[0] = 0; pos[1] = 0; pos[2] = 0;
-            vel[0] = 0; vel[1] = 0; vel[2] = 0;
+            if (pinCenter) {
+              pos[0] = 0; pos[1] = 0; pos[2] = 0;
+              vel[0] = 0; vel[1] = 0; vel[2] = 0;
+            }
 
             computeAccelerations();
             for (let i = 0; i < N * 3; i++) {
@@ -331,21 +339,22 @@ const { controls = false } = Astro.props;
       const newPos = e.data.pos;
       if (!planetPoints || !trails) { isWorkerBusy = false; return; }
 
-      // Sun mesh follows worker position (always 0,0,0 but kept general)
-      sunGroup.position.set(newPos[0], newPos[1], newPos[2]);
+      const numPoints = currentN - currentBodyOffset;
 
-      // Planet positions (indices 1..N-1 in worker → 0..numPlanets-1 in Points)
-      const numPlanets = currentN - 1;
+      if (currentShowSun) {
+        sunGroup.position.set(newPos[0], newPos[1], newPos[2]);
+        planetMaterial.uniforms.u_sunPos.value.set(newPos[0], newPos[1], newPos[2]);
+      }
+
       const pArr = planetPoints.geometry.attributes.position.array as Float32Array;
-      for (let i = 1; i < currentN; i++) {
-        const pi = (i - 1) * 3;
+      for (let i = currentBodyOffset; i < currentN; i++) {
+        const pi = (i - currentBodyOffset) * 3;
         pArr[pi]     = newPos[i * 3];
         pArr[pi + 1] = newPos[i * 3 + 1];
         pArr[pi + 2] = newPos[i * 3 + 2];
       }
       planetPoints.geometry.attributes.position.needsUpdate = true;
 
-      // Trail history (stores all N bodies for indexing consistency)
       history[historyIdx].set(newPos);
 
       let pIdx = historyIdx;
@@ -355,8 +364,8 @@ const { controls = false } = Astro.props;
         const currPos = history[currIdx];
         const prevPos = history[prevIdx];
 
-        for (let p = 0; p < numPlanets; p++) {
-          const bodyIdx = p + 1;
+        for (let p = 0; p < numPoints; p++) {
+          const bodyIdx = p + currentBodyOffset;
           const base = (p * numSegments + s) * 6;
           trailVertices[base]     = currPos[bodyIdx * 3];
           trailVertices[base + 1] = currPos[bodyIdx * 3 + 1];
@@ -370,7 +379,6 @@ const { controls = false } = Astro.props;
       trails.geometry.attributes.position.needsUpdate = true;
       historyIdx = (historyIdx + 1) % TRAIL_LENGTH;
 
-      // Grid deformation uniforms (all bodies including sun)
       const gridArr = gridMaterial.uniforms.u_bodies.value;
       const count = Math.min(currentN, 50);
       for (let i = 0; i < count; i++) {
@@ -384,25 +392,29 @@ const { controls = false } = Astro.props;
       isWorkerBusy = false;
     };
 
-    // ── Simulation init ─────────────────────────────────────────────────
-    const initSim = (N: number, G: number, dt: number) => {
-      currentN = N;
-      if (planetPoints) scene.remove(planetPoints);
-      if (trails) scene.remove(trails);
+    // ── Scenario definitions ────────────────────────────────────────────
+    type ScenarioData = {
+      N: number;
+      G: number;
+      dt: number;
+      stepsPerFrame: number;
+      pinCenter: boolean;
+      showSun: boolean;
+      pos: Float32Array;
+      vel: Float32Array;
+      mass: Float32Array;
+      colors: Float32Array;
+      sizes: Float32Array;
+    };
 
-      const numPlanets = N - 1;
-
-      // Full arrays for worker (sun + planets)
+    const generateCustomScenario = (N: number, G: number, dt: number): ScenarioData => {
       const pos  = new Float32Array(N * 3);
       const vel  = new Float32Array(N * 3);
       const mass = new Float32Array(N);
+      const numPoints = N - 1;
+      const colors = new Float32Array(numPoints * 3);
+      const sizes  = new Float32Array(numPoints);
 
-      // Render-only arrays (planets)
-      const planetPos = new Float32Array(numPlanets * 3);
-      const colors    = new Float32Array(numPlanets * 3);
-      const sizes     = new Float32Array(numPlanets);
-
-      // Body 0 = central star (handled by sunGroup mesh)
       mass[0] = 10000;
 
       const colorPalette = [
@@ -433,31 +445,138 @@ const { controls = false } = Astro.props;
 
         const pi = i - 1;
         sizes[pi] = 2.0 + Math.random() * 2.5;
-
         const c = colorPalette[Math.floor(Math.random() * colorPalette.length)];
         colors[pi * 3] = c.r; colors[pi * 3 + 1] = c.g; colors[pi * 3 + 2] = c.b;
-
-        planetPos[pi * 3]     = pos[i * 3];
-        planetPos[pi * 3 + 1] = pos[i * 3 + 1];
-        planetPos[pi * 3 + 2] = pos[i * 3 + 2];
       }
 
-      currentMasses = mass;
+      return { N, G, dt, stepsPerFrame: 1, pinCenter: true, showSun: true, pos, vel, mass, colors, sizes };
+    };
 
-      // Planet Points
+    const generateOrthogonalBinaries = (): ScenarioData => {
+      const N = 4;
+      const G = 0.5;          // weaker gravity → less chaotic coupling
+      const dt = 0.002;       // slightly faster, still stable
+      const m = 200;
+      const d1 = 10;          // radius of inner binary
+      const d2 = 20;          // radius of outer binary (no overlapping radii)
+      const v1 = Math.sqrt(G * m / (4 * d1)); // circular speeds
+      const v2 = Math.sqrt(G * m / (4 * d2));
+
+      const pos  = new Float32Array(N * 3);
+      const vel  = new Float32Array(N * 3);
+      const mass = new Float32Array(N);
+
+      // Binary A — XZ plane, radius d1, COM at origin
+      mass[0] = m;
+      pos[0]  =  d1; pos[1]  = 0;  pos[2]  = 0;
+      vel[0]  =  0;  vel[1]  = 0;  vel[2]  =  v1;
+
+      mass[1] = m;
+      pos[3]  = -d1; pos[4]  = 0;  pos[5]  = 0;
+      vel[3]  =  0;  vel[4]  = 0;  vel[5]  = -v1;
+
+      // Binary B — XY plane, radius d2, COM at origin
+      mass[2] = m;
+      pos[6]  = 0;   pos[7]  =  d2; pos[8]  = 0;
+      vel[6]  = -v2; vel[7]  =  0;  vel[8]  = 0;
+
+      mass[3] = m;
+      pos[9]  = 0;   pos[10] = -d2; pos[11] = 0;
+      vel[9]  =  v2; vel[10] =  0;  vel[11] = 0;
+
+      const colors = new Float32Array([
+        1.0, 0.65, 0.45, // warm orange
+        0.6, 0.8, 1.0,   // cool blue
+        1.0, 1.0, 0.8,   // pale yellow
+        0.7, 1.0, 0.9,   // teal
+      ]);
+      const sizes = new Float32Array([4.0, 4.0, 4.0, 4.0]); // normal planet size
+
+      // 2 steps per frame → visually faster
+      return { N, G, dt, stepsPerFrame: 2, pinCenter: false, showSun: false, pos, vel, mass, colors, sizes };
+    };
+
+    const generateSolarSystem = (): ScenarioData => {
+      const planets = [
+        { r: 10,  angle: 0,     mass: 0.5,  color: [0.53, 0.53, 0.53], size: 1.2 },
+        { r: 16,  angle: 1.05,  mass: 4,    color: [0.91, 0.80, 0.63], size: 2.0 },
+        { r: 22,  angle: 2.09,  mass: 5,    color: [0.29, 0.44, 0.87], size: 2.2 },
+        { r: 30,  angle: 3.49,  mass: 2,    color: [0.76, 0.27, 0.05], size: 1.6 },
+        { r: 48,  angle: 4.89,  mass: 100,  color: [0.83, 0.61, 0.49], size: 5.0 },
+        { r: 62,  angle: 0.61,  mass: 70,   color: [0.91, 0.73, 0.31], size: 4.5 },
+        { r: 76,  angle: 2.79,  mass: 20,   color: [0.55, 0.69, 0.87], size: 3.0 },
+        { r: 88,  angle: 3.93,  mass: 15,   color: [0.23, 0.36, 0.87], size: 2.8 },
+      ];
+
+      const N = planets.length + 1;
+      const G = 1.0;
+      const dt = 0.002;
+      const sunMass = 10000;
+
+      const pos  = new Float32Array(N * 3);
+      const vel  = new Float32Array(N * 3);
+      const mass = new Float32Array(N);
+      const colors = new Float32Array(planets.length * 3);
+      const sizes  = new Float32Array(planets.length);
+
+      mass[0] = sunMass;
+
+      for (let i = 0; i < planets.length; i++) {
+        const p = planets[i];
+        const bi = i + 1;
+
+        mass[bi] = p.mass;
+        pos[bi * 3]     = Math.cos(p.angle) * p.r;
+        pos[bi * 3 + 1] = 0;
+        pos[bi * 3 + 2] = Math.sin(p.angle) * p.r;
+
+        const speed = Math.sqrt(G * sunMass / p.r);
+        vel[bi * 3]     = -Math.sin(p.angle) * speed;
+        vel[bi * 3 + 1] = 0;
+        vel[bi * 3 + 2] =  Math.cos(p.angle) * speed;
+
+        colors[i * 3] = p.color[0]; colors[i * 3 + 1] = p.color[1]; colors[i * 3 + 2] = p.color[2];
+        sizes[i] = p.size;
+      }
+
+      return { N, G, dt, stepsPerFrame: 4, pinCenter: true, showSun: true, pos, vel, mass, colors, sizes };
+    };
+
+    // ── Unified simulation initializer ──────────────────────────────────
+    const initSim = (data: ScenarioData) => {
+      currentN = data.N;
+      currentStepsPerFrame = data.stepsPerFrame;
+      currentShowSun = data.showSun;
+      currentBodyOffset = data.showSun ? 1 : 0;
+      currentMasses = data.mass;
+
+      sunGroup.visible = data.showSun;
+
+      if (planetPoints) scene.remove(planetPoints);
+      if (trails) scene.remove(trails);
+
+      const numPoints = data.N - currentBodyOffset;
+
+      const planetPos = new Float32Array(numPoints * 3);
+      for (let i = 0; i < numPoints; i++) {
+        const bi = i + currentBodyOffset;
+        planetPos[i * 3]     = data.pos[bi * 3];
+        planetPos[i * 3 + 1] = data.pos[bi * 3 + 1];
+        planetPos[i * 3 + 2] = data.pos[bi * 3 + 2];
+      }
+
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(planetPos, 3));
-      geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
-      geo.setAttribute('size',     new THREE.BufferAttribute(sizes, 1));
+      geo.setAttribute('color',    new THREE.BufferAttribute(data.colors, 3));
+      geo.setAttribute('size',     new THREE.BufferAttribute(data.sizes, 1));
       planetPoints = new THREE.Points(geo, planetMaterial);
       scene.add(planetPoints);
 
-      // Trails (planets only)
-      trailVertices = new Float32Array(numPlanets * numSegments * 2 * 3);
-      const trailColors = new Float32Array(numPlanets * numSegments * 2 * 4);
+      trailVertices = new Float32Array(numPoints * numSegments * 2 * 3);
+      const trailColors = new Float32Array(numPoints * numSegments * 2 * 4);
 
-      for (let p = 0; p < numPlanets; p++) {
-        const r = colors[p * 3], g = colors[p * 3 + 1], b = colors[p * 3 + 2];
+      for (let p = 0; p < numPoints; p++) {
+        const r = data.colors[p * 3], g = data.colors[p * 3 + 1], b = data.colors[p * 3 + 2];
         for (let s = 0; s < numSegments; s++) {
           const idx1 = (p * numSegments + s) * 2;
           const idx2 = idx1 + 1;
@@ -481,22 +600,36 @@ const { controls = false } = Astro.props;
       }));
       scene.add(trails);
 
-      // History ring-buffer
       history = [];
-      for (let i = 0; i < TRAIL_LENGTH; i++) history.push(new Float32Array(pos));
+      for (let i = 0; i < TRAIL_LENGTH; i++) history.push(new Float32Array(data.pos));
       historyIdx = 0;
       isWorkerBusy = false;
 
-      gridMaterial.uniforms.u_G.value = G;
+      gridMaterial.uniforms.u_G.value = data.G;
       planetMaterial.uniforms.u_fov.value = camera.fov * Math.PI / 180.0;
       planetMaterial.uniforms.u_viewportHeight.value = container.clientHeight * window.devicePixelRatio;
 
-      worker.postMessage({ type: 'init', pos: new Float32Array(pos), vel, mass, N, G, dt });
+      if (!data.showSun) {
+        planetMaterial.uniforms.u_sunPos.value.set(0, 0, 0);
+      }
+
+      worker.postMessage({
+        type: 'init',
+        pos: new Float32Array(data.pos),
+        vel: new Float32Array(data.vel),
+        mass: data.mass,
+        N: data.N,
+        G: data.G,
+        dt: data.dt,
+        pinCenter: data.pinCenter
+      });
     };
 
     // ── Controls ────────────────────────────────────────────────────────
-    let state = { n: 10, g: 1.0, dt: 0.005 };
-    initSim(state.n, state.g, state.dt);
+    let activeScenario = 'custom';
+    let customState = { n: 10, g: 1.0, dt: 0.005 };
+
+    initSim(generateCustomScenario(customState.n, customState.g, customState.dt));
 
     const controlsDiv = document.getElementById('gravity-controls');
     if (controlsDiv) {
@@ -507,6 +640,8 @@ const { controls = false } = Astro.props;
       const valG  = document.getElementById('val-g');
       const valDt = document.getElementById('val-dt');
       const resetBtn = document.getElementById('sim-reset');
+      const customControls = document.getElementById('custom-controls');
+      const scenarioBtns = controlsDiv.querySelectorAll('.scenario-btn') as NodeListOf<HTMLButtonElement>;
 
       const updateLabels = () => {
         if (valN)  valN.innerText  = elN.value;
@@ -514,15 +649,57 @@ const { controls = false } = Astro.props;
         if (valDt) valDt.innerText = elDt.value;
       };
 
+      const setActiveButton = (scenario: string) => {
+        scenarioBtns.forEach(btn => {
+          if (btn.dataset.scenario === scenario) {
+            btn.className = 'scenario-btn px-4 py-1.5 rounded border text-xs font-medium transition-colors border-blue-500 bg-blue-500/10 text-blue-400';
+          } else {
+            btn.className = 'scenario-btn px-4 py-1.5 rounded border text-xs font-medium transition-colors border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200';
+          }
+        });
+      };
+
+      const switchScenario = (scenario: string) => {
+        activeScenario = scenario;
+        setActiveButton(scenario);
+
+        if (customControls) {
+          customControls.style.display = scenario === 'custom' ? '' : 'none';
+        }
+
+        // handle orthogonal-specific flags
+        if (scenario === 'orthogonal') {
+          orthTime = 0;
+          if (trails) trails.visible = false;
+        } else {
+          if (trails) trails.visible = true;
+        }
+
+        if (scenario === 'custom') {
+          customState.n  = parseInt(elN.value);
+          customState.g  = parseFloat(elG.value);
+          customState.dt = parseFloat(elDt.value);
+          initSim(generateCustomScenario(customState.n, customState.g, customState.dt));
+        } else if (scenario === 'orthogonal') {
+          initSim(generateOrthogonalBinaries());
+        } else if (scenario === 'solar') {
+          initSim(generateSolarSystem());
+        }
+      };
+
+      scenarioBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchScenario(btn.dataset.scenario!));
+      });
+
       if (elN && elG && elDt && resetBtn) {
         elN.addEventListener('input', updateLabels);
         elG.addEventListener('input', updateLabels);
         elDt.addEventListener('input', updateLabels);
         resetBtn.addEventListener('click', () => {
-          state.n  = parseInt(elN.value);
-          state.g  = parseFloat(elG.value);
-          state.dt = parseFloat(elDt.value);
-          initSim(state.n, state.g, state.dt);
+          customState.n  = parseInt(elN.value);
+          customState.g  = parseFloat(elG.value);
+          customState.dt = parseFloat(elDt.value);
+          initSim(generateCustomScenario(customState.n, customState.g, customState.dt));
         });
       }
     }
@@ -567,10 +744,47 @@ const { controls = false } = Astro.props;
     // ── Render loop ─────────────────────────────────────────────────────
     const animate = () => {
       requestAnimationFrame(animate);
-      if (!isWorkerBusy) {
-        isWorkerBusy = true;
-        worker.postMessage({ type: 'step', steps: 1 });
+
+      // Analytic orthogonal binaries: keep two binaries perfectly periodic
+      if (activeScenario === 'orthogonal' && planetPoints) {
+        const r1 = 10;
+        const r2 = 20;
+        const w1 = 0.4;
+        const w2 = 0.25;
+        const dtVis = 0.02;
+        orthTime += dtVis;
+
+        const a1 = orthTime * w1;
+        const a2 = orthTime * w2;
+
+        const pArr = planetPoints.geometry.attributes.position.array as Float32Array;
+
+        // Binary A in XZ plane
+        pArr[0] =  r1 * Math.cos(a1);
+        pArr[1] =  0;
+        pArr[2] =  r1 * Math.sin(a1);
+
+        pArr[3] = -r1 * Math.cos(a1);
+        pArr[4] =  0;
+        pArr[5] = -r1 * Math.sin(a1);
+
+        // Binary B in XY plane
+        pArr[6]  =  r2 * Math.cos(a2);
+        pArr[7]  =  r2 * Math.sin(a2);
+        pArr[8]  =  0;
+
+        pArr[9]  = -r2 * Math.cos(a2);
+        pArr[10] = -r2 * Math.sin(a2);
+        pArr[11] =  0;
+
+        planetPoints.geometry.attributes.position.needsUpdate = true;
+      } else {
+        if (!isWorkerBusy) {
+          isWorkerBusy = true;
+          worker.postMessage({ type: 'step', steps: currentStepsPerFrame });
+        }
       }
+
       renderer.render(scene, camera);
     };
     animate();

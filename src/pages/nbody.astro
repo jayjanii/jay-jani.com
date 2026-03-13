@@ -4,19 +4,54 @@ import GravitySim from '../components/GravitySim.astro';
 ---
 
 <Layout title="N-Body Simulation - Jay Jani">
-  <section class="mb-8">
+  <section>
     <a href="/" class="text-blue-400 hover:underline mb-4 inline-block">&larr; Back to Home</a>
-    <h1 class="text-3xl font-bold mb-2 text-white">N-Body Gravitational Simulator</h1>
+    <h1 class="text-3xl font-bold text-white">N-Body Gravitational Simulator</h1>
     <p class="text-gray-400">
-      A high-performance, real-time N-body gravitational simulation running entirely in the browser using Three.js and WebWorkers. Offloading the O(N&sup2;) physics calculations to a WebWorker keeps the main thread unblocked, ensuring a smooth 60fps framerate.
+      A high-performance, real-time N-body gravitational simulation.
     </p>
-  </section>
-
-  <section class="mb-12">
+    <a
+      href="https://github.com/jayjanii/n-body-sim"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="mb-3 mt-10 inline-flex items-center gap-3 px-5 py-3 rounded-lg border border-gray-700 bg-gray-900/50 hover:border-gray-500 hover:bg-gray-800/60 transition-colors group"
+    >
+      <svg class="w-6 h-6 text-gray-300 group-hover:text-white transition-colors" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.031 1.531 1.031.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.026 2.747-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.944.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.2 22 16.447 22 12.021 22 6.484 17.523 2 12 2z"/>
+      </svg>
+      <div>
+        <div class="text-white font-semibold text-base group-hover:underline">View Full Implementation on GitHub</div>
+        <div class="text-gray-400 text-xs mt-0.5">C++ / OpenGL original</div>
+      </div>
+      <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+      </svg>
+    </a>
     <GravitySim controls={true} />
+    <div class="mt-4 flex justify-center">
+      <a
+        href="#how-it-works"
+        class="flex flex-col items-center text-xs text-gray-400 hover:text-gray-200 transition-colors motion-safe:animate-bounce"
+      >
+        <span>How it works</span>
+        <svg
+          class="w-4 h-4 mt-1"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14" />
+          <path d="M5 12l7 7 7-7" />
+        </svg>
+      </a>
+    </div>
   </section>
 
-  <section class="text-gray-400 leading-relaxed space-y-4">
+  <section id="how-it-works" class="text-gray-400 leading-relaxed space-y-4 scroll-mt-24">
     <h2 class="text-xl font-bold text-white">How it works</h2>
     <p>
       This simulation uses a <strong>Symplectic Velocity Verlet</strong> integrator. Unlike basic Euler integration, Velocity Verlet preserves the Hamiltonian (total energy) of the system over long periods, allowing stable elliptical orbits to form.
@@ -24,5 +59,10 @@ import GravitySim from '../components/GravitySim.astro';
     <p>
       The stars (particles) are drawn using an <code>AdditiveBlending</code> material with a custom radial gradient, creating a bloom effect as multiple bodies overlap. Fading orbital paths are maintained via line segments updated each frame.
     </p>
+    <p>
+      This is a port of a C++ simulation I originally built using OpenGL and GLFW. The core physics loop &mdash; force accumulation, Velocity Verlet integration, and softened gravity &mdash; was translated directly into a <code>WebWorker</code>, preserving the same numerical approach. The rendering layer was rewritten using Three.js in place of raw OpenGL draw calls, and all inter-thread communication is handled via <code>postMessage</code> with typed arrays to keep data transfer overhead minimal.
+    </p>
   </section>
+
+  
 </Layout>
