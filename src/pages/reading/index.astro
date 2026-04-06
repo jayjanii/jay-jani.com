@@ -1,0 +1,160 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { TAGS } from '../../lib/reading';
+---
+
+<Layout title="Reading List - Jay Jani">
+  <div class="max-w-4xl mx-auto py-10 px-4">
+    <div class="flex items-center justify-between mb-8">
+      <a href="/" class="text-blue-400 hover:underline text-sm">&larr; Home</a>
+      <a href="/reading/admin" class="text-gray-500 hover:text-gray-300 text-xs transition-colors">Admin</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-white mb-2">Reading List</h1>
+    <p class="text-gray-500 text-sm mb-8">Research papers and articles I'm working through.</p>
+
+    <!-- Stats Bar -->
+    <div id="stats" class="grid grid-cols-3 gap-3 mb-8">
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-total" class="text-2xl font-bold text-white">0</div>
+        <div class="text-gray-500 text-xs mt-1">Total Papers</div>
+      </div>
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-reading" class="text-2xl font-bold text-blue-300">0</div>
+        <div class="text-gray-500 text-xs mt-1">Currently Reading</div>
+      </div>
+      <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
+        <div id="stat-read" class="text-2xl font-bold text-green-300">0</div>
+        <div class="text-gray-500 text-xs mt-1">Finished</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <div id="status-btns" class="flex gap-1">
+        <button data-status="" class="status-btn px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors">All</button>
+        <button data-status="to-read" class="status-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">To Read</button>
+        <button data-status="reading" class="status-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">Reading</button>
+        <button data-status="read" class="status-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">Read</button>
+      </div>
+    </div>
+
+    <div id="tag-filter" class="flex flex-wrap gap-1.5 mb-8">
+      <button data-ftag="" class="ftag-btn px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors">All Tags</button>
+      {TAGS.map(t => (
+        <button data-ftag={t} class="ftag-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">{t}</button>
+      ))}
+    </div>
+
+    <!-- Paper List -->
+    <div id="paper-list" class="space-y-3"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="text-center py-16 hidden">
+      <p class="text-gray-500 text-sm mb-4">No papers on the list yet.</p>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { type Paper, STATUS_LABELS, STATUS_COLORS, fetchPapers } from '../../lib/reading';
+
+  const statTotal   = document.getElementById('stat-total')!;
+  const statReading = document.getElementById('stat-reading')!;
+  const statRead    = document.getElementById('stat-read')!;
+  const paperList   = document.getElementById('paper-list') as HTMLDivElement;
+  const emptyState  = document.getElementById('empty-state') as HTMLDivElement;
+
+  let activeStatus = '';
+  let activeTag = '';
+  let allPapers: Paper[] = [];
+
+  function activateBtn(selector: string, attr: string, value: string) {
+    document.querySelectorAll<HTMLButtonElement>(selector).forEach(b => {
+      const on = b.getAttribute(attr) === value;
+      b.classList.toggle('bg-blue-600/30', on);
+      b.classList.toggle('border-blue-500', on);
+      b.classList.toggle('text-blue-300', on);
+      b.classList.toggle('border-gray-700', !on);
+      b.classList.toggle('text-gray-400', !on);
+    });
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.status-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeStatus = btn.dataset.status!; activateBtn('.status-btn', 'data-status', activeStatus); applyFilters(); })
+  );
+  document.querySelectorAll<HTMLButtonElement>('.ftag-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeTag = btn.dataset.ftag!; activateBtn('.ftag-btn', 'data-ftag', activeTag); applyFilters(); })
+  );
+
+  function applyFilters() {
+    const filtered = allPapers.filter(p => {
+      if (activeStatus && p.status !== activeStatus) return false;
+      if (activeTag && !p.tags.includes(activeTag)) return false;
+      return true;
+    });
+
+    const allEmpty = allPapers.length === 0;
+    emptyState.classList.toggle('hidden', !allEmpty);
+    document.getElementById('stats')!.classList.toggle('hidden', allEmpty);
+
+    statTotal.textContent = String(allPapers.length);
+    statReading.textContent = String(allPapers.filter(p => p.status === 'reading').length);
+    statRead.textContent = String(allPapers.filter(p => p.status === 'read').length);
+
+    renderList(filtered);
+  }
+
+  function renderList(papers: Paper[]) {
+    paperList.innerHTML = '';
+
+    if (papers.length === 0 && allPapers.length > 0) {
+      paperList.innerHTML = '<p class="text-gray-600 text-sm">No papers match the current filters.</p>';
+      return;
+    }
+
+    const statusOrder = ['reading', 'to-read', 'read'];
+    const sorted = [...papers].sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+
+    for (const paper of sorted) {
+      const sc = STATUS_COLORS[paper.status] || STATUS_COLORS['to-read'];
+      const card = document.createElement('article');
+      card.className = 'bg-gray-900/40 border border-gray-800 rounded-xl p-5 hover:bg-gray-900/60 transition-colors';
+
+      const titleHtml = paper.url
+        ? `<a href="${paper.url}" target="_blank" rel="noopener" class="text-white font-bold text-sm hover:text-blue-300 transition-colors">${paper.title}</a>`
+        : `<span class="text-white font-bold text-sm">${paper.title}</span>`;
+
+      card.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 flex-wrap mb-1.5">
+              ${titleHtml}
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-medium ${sc.bg} ${sc.border} ${sc.text} border">${STATUS_LABELS[paper.status] || paper.status}</span>
+            </div>
+            <div class="flex items-baseline gap-2 text-xs text-gray-500 mb-2">
+              ${paper.authors ? `<span>${paper.authors}</span>` : ''}
+              ${paper.year ? `<span class="text-gray-600">(${paper.year})</span>` : ''}
+            </div>
+            ${paper.tags.length ? `<div class="flex flex-wrap gap-1 mb-2">${paper.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
+            ${paper.notes ? `<p class="text-gray-500 text-xs">${paper.notes}</p>` : ''}
+          </div>
+          ${paper.url ? `
+            <a href="${paper.url}" target="_blank" rel="noopener" class="shrink-0 text-gray-500 hover:text-blue-400 transition-colors" aria-label="Open paper">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            </a>
+          ` : ''}
+        </div>
+      `;
+
+      paperList.appendChild(card);
+    }
+  }
+
+  async function init() {
+    allPapers = await fetchPapers();
+    applyFilters();
+  }
+
+  init();
+</script>

@@ -44,7 +44,7 @@ export const COLOR_HEX: Record<string, string> = {
 // ── API client ──────────────────────────────────────────────────────────────
 
 function authHeaders(): Record<string, string> {
-  const token = sessionStorage.getItem('admin-token');
+  const token = localStorage.getItem('admin-token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

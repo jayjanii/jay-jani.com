@@ -113,7 +113,7 @@ import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
 
     const ok = await verifyPassword(pw);
     if (ok) {
-      sessionStorage.setItem('admin-token', pw);
+      localStorage.setItem('admin-token', pw);
       gate.classList.add('hidden');
       adminUI.classList.remove('hidden');
       await loadList();
@@ -129,7 +129,7 @@ import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
   authPw.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
 
   // Check existing session
-  if (sessionStorage.getItem('admin-token')) {
+  if (localStorage.getItem('admin-token')) {
     gate.classList.add('hidden');
     adminUI.classList.remove('hidden');
     loadList();
@@ -246,7 +246,7 @@ import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
     } catch (err: any) {
       if (err.message === 'Unauthorized') {
         alert('Session expired. Please re-enter the admin password.');
-        sessionStorage.removeItem('admin-token');
+        localStorage.removeItem('admin-token');
         gate.classList.remove('hidden');
         adminUI.classList.add('hidden');
       } else {

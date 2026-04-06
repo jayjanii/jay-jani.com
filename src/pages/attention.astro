@@ -1,0 +1,243 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="ViT Attention Visualization - Jay Jani">
+  <section>
+    <a href="/" class="text-blue-400 hover:underline mb-4 inline-block">&larr; Back to Home</a>
+    <h1 class="text-3xl font-bold text-white">ViT Attention Visualization</h1>
+    <p class="text-gray-400">
+      Exploring how Vision Transformers "see" images by visualizing attention maps across 100 COCO images.
+    </p>
+    <a
+      href="https://github.com/jayjanii/attention-visualization"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="mb-3 mt-10 inline-flex items-center gap-3 px-5 py-3 rounded-lg border border-gray-700 bg-gray-900/50 hover:border-gray-500 hover:bg-gray-800/60 transition-colors group"
+    >
+      <svg class="w-6 h-6 text-gray-300 group-hover:text-white transition-colors" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.031 1.531 1.031.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.026 2.747-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.944.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.2 22 16.447 22 12.021 22 6.484 17.523 2 12 2z"/>
+      </svg>
+      <div>
+        <div class="text-white font-semibold text-base group-hover:underline">View Full Implementation on GitHub</div>
+        <div class="text-gray-400 text-xs mt-0.5">Python / Marimo notebook</div>
+      </div>
+      <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+      </svg>
+    </a>
+
+    <!-- Model callout -->
+    <div class="mt-8 bg-gray-900/50 border border-gray-800 rounded-xl p-4 text-sm text-gray-400 flex flex-col sm:flex-row gap-4">
+      <div class="flex-1">
+        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Model</div>
+        <div class="text-white font-mono text-sm">google/vit-large-patch16-224</div>
+      </div>
+      <div class="flex-1">
+        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Parameters</div>
+        <div class="text-white">307M</div>
+      </div>
+      <div class="flex-1">
+        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Architecture</div>
+        <div class="text-white">24 layers &middot; 16 heads &middot; 16&times;16 patches</div>
+      </div>
+      <div class="flex-1">
+        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Dataset</div>
+        <div class="text-white">100 COCO images &mdash; 4 categories</div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex justify-center">
+      <a
+        href="#findings"
+        class="flex flex-col items-center text-xs text-gray-400 hover:text-gray-200 transition-colors motion-safe:animate-bounce"
+      >
+        <span>Findings</span>
+        <svg
+          class="w-4 h-4 mt-1"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14" />
+          <path d="M5 12l7 7 7-7" />
+        </svg>
+      </a>
+    </div>
+  </section>
+
+  <section id="findings" class="text-gray-400 leading-relaxed space-y-10 scroll-mt-24">
+
+    <!-- What I was investigating -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white">What I Was Investigating</h2>
+      <p>
+        Vision Transformers treat images as sequences of patches. A 224&times;224 image gets divided into a
+        14&times;14 grid of 16&times;16 pixel patches, each becoming a token analogous to a word in a language model.
+        The model uses multi-head self-attention across these 197 tokens (196 patches + 1 CLS token) to form its
+        classification.
+      </p>
+      <p>
+        The core question: <strong class="text-gray-200">can we look inside the attention mechanism and understand
+        what the model is actually focusing on when it makes a prediction?</strong>
+      </p>
+      <p>Two methods were compared:</p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+          <div class="text-white font-semibold mb-2">Last Layer Attention</div>
+          <p class="text-sm">
+            Extract the CLS token's attention weights from the final transformer block only, averaged across all
+            16 heads. Simple but noisy — averaging collapses the signal from heads that specialize in very
+            different things.
+          </p>
+        </div>
+        <div class="bg-gray-900/50 border border-blue-900/40 rounded-xl p-4">
+          <div class="text-white font-semibold mb-2">Attention Rollout</div>
+          <p class="text-sm">
+            Propagate attention through all 24 layers by multiplying attention matrices sequentially,
+            accounting for residual connections by adding the identity matrix at each step. More faithful
+            to how information actually flows through the network.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Last layer result -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white">Last Layer Attention</h2>
+      <p>
+        Last layer attention maps were noisy and generally not insightful. Averaging across 16 heads in a single
+        layer mixes signals from heads that specialize in very different things &mdash; foreground/background
+        separation, texture, local edges &mdash; producing a blurry aggregate that rarely tells a clean story.
+      </p>
+      <figure class="rounded-xl overflow-hidden border border-gray-800 bg-black">
+        <img
+          src="https://raw.githubusercontent.com/jayjanii/attention-visualization/master/attention2.png"
+          alt="Last layer attention map example showing noisy output"
+          class="w-full object-contain max-h-80"
+          loading="lazy"
+        />
+        <figcaption class="text-xs text-gray-500 text-center py-2 px-4">
+          Last layer attention — noisy and not informative. Attention rollout proved significantly more useful.
+        </figcaption>
+      </figure>
+    </div>
+
+    <!-- Rollout findings -->
+    <div class="space-y-6">
+      <h2 class="text-xl font-bold text-white">Rollout Attention &mdash; Findings</h2>
+
+      <!-- Horse -->
+      <div class="space-y-3">
+        <h3 class="text-base font-semibold text-gray-200">Horse &mdash; Clean Attention, Correct Classification</h3>
+        <figure class="rounded-xl overflow-hidden border border-gray-800 bg-black">
+          <img
+            src="https://raw.githubusercontent.com/jayjanii/attention-visualization/master/output/rollout/horse_1.png"
+            alt="Rollout attention map for a horse image"
+            class="w-full object-contain max-h-80"
+            loading="lazy"
+          />
+        </figure>
+        <p class="text-sm">
+          One of the cleaner results. The model correctly classifies the subject and the attention clearly
+          concentrates on the horse and rider, with the background largely ignored. This is the ideal case
+          &mdash; the attention map confirms the model is looking at the right thing for the right reason.
+        </p>
+      </div>
+
+      <!-- Car foreground bias -->
+      <div class="space-y-3">
+        <h3 class="text-base font-semibold text-gray-200">Car &mdash; Foreground Bias, Background Miss</h3>
+        <figure class="rounded-xl overflow-hidden border border-gray-800 bg-black">
+          <img
+            src="https://raw.githubusercontent.com/jayjanii/attention-visualization/master/output/rollout/car_24.png"
+            alt="Rollout attention map for a car image with background car missed"
+            class="w-full object-contain max-h-80"
+            loading="lazy"
+          />
+        </figure>
+        <p class="text-sm">
+          The model correctly classifies the foreground subject but misses a car visible in the background.
+          The attention is semi-clean and focused on the primary subject. This reveals a fundamental behavior
+          of this classification setup: the model optimizes for the dominant subject, not exhaustive object
+          detection. A car in the background simply isn't what the CLS token learns to attend to.
+        </p>
+      </div>
+
+      <!-- Car reasonable failure -->
+      <div class="space-y-3">
+        <h3 class="text-base font-semibold text-gray-200">Car &mdash; Reasonable "Failure"</h3>
+        <figure class="rounded-xl overflow-hidden border border-gray-800 bg-black">
+          <img
+            src="https://raw.githubusercontent.com/jayjanii/attention-visualization/master/output/rollout/car_21.png"
+            alt="Rollout attention map for a car barely visible in scene"
+            class="w-full object-contain max-h-80"
+            loading="lazy"
+          />
+        </figure>
+        <p class="text-sm">
+          Even as a human, the car in this image is barely visible. The attention map is noisy, but the
+          model lands on one of the salient aspects of the scene. This is less a model failure and more a
+          dataset mismatch &mdash; this kind of image suits a model built for binary detection rather than
+          subject classification. A good reminder that evaluation has to account for what task the model
+          was actually trained for.
+        </p>
+      </div>
+
+      <!-- Bicycle surprising -->
+      <div class="space-y-3">
+        <h3 class="text-base font-semibold text-gray-200">Bicycle &mdash; Surprising Correct Classification</h3>
+        <figure class="rounded-xl overflow-hidden border border-gray-800 bg-black">
+          <img
+            src="https://raw.githubusercontent.com/jayjanii/attention-visualization/master/output/rollout/bicycle_1.png"
+            alt="Rollout attention map for a bicycle scene with no obvious subject"
+            class="w-full object-contain max-h-80"
+            loading="lazy"
+          />
+        </figure>
+        <p class="text-sm">
+          No bicycle is clearly visible in this image, yet the model correctly predicted "monastery" with
+          hotspots concentrated at the top of the image where the towers are. The most surprising result
+          &mdash; the attention map is landing on a genuinely meaningful part of the scene even without a
+          clean subject, showing the model has learned rich visual features beyond just the labeled category.
+        </p>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white">Limitations</h2>
+      <ul class="space-y-3 text-sm list-none">
+        {[
+          ["ImageNet's vocabulary is quirky.", "The model maps to 21,000 ImageNet categories which are oddly specific — it knows \"sorrel\" (a horse color) and \"Egyptian cat\" but not generic \"horse\" or \"cat.\" Many predictions that look wrong are actually correct at a finer granularity."],
+          ["Averaging heads loses information.", "Both methods average across attention heads before visualization. Individual heads often specialize meaningfully — some track foreground/background, others local texture, others global structure. Averaging collapses this into a single signal that can be misleading."],
+          ["Last layer attention is shallow.", "It only captures what the final layer attends to, ignoring how representations were built up across all 24 layers. Rollout addresses this but introduces its own approximation."],
+          ["Classification ≠ detection.", "This model was trained to identify the primary subject of an image. The attention maps reflect this — they optimize for the dominant subject, not background objects."],
+          ["Low resolution attention maps.", "The 14×14 patch grid gets bilinearly upsampled to 224×224 for visualization. A hotspot covers at minimum a 16×16 pixel region."],
+        ].map(([title, body]) => (
+          <li class="bg-gray-900/40 border border-gray-800 rounded-lg p-4">
+            <span class="text-gray-200 font-medium">{title}</span>{" "}
+            {body}
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <!-- What I Learned -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white">What I Learned</h2>
+      <ul class="space-y-2 text-sm list-disc list-inside marker:text-gray-600">
+        <li>How images become token sequences in ViT (patching, flattening, positional embeddings)</li>
+        <li>The role of the CLS token as a learned aggregator that attends across all patches</li>
+        <li>How multi-head self-attention works in a vision context &mdash; same Q/K/V machinery as language models</li>
+        <li>Why residual connections matter and how they're accounted for in attention rollout</li>
+        <li>That attention visualization is a useful debugging tool but not a ground truth explanation &mdash; it shows correlation between attention and prediction, not causation</li>
+      </ul>
+    </div>
+
+  </section>
+</Layout>

@@ -1,0 +1,293 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
+---
+
+<Layout title="Reading Admin - Jay Jani">
+  <!-- Auth gate overlay -->
+  <div id="auth-gate" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-8 max-w-sm w-full mx-4">
+      <h2 class="text-lg font-bold text-white mb-1">Admin Access</h2>
+      <p class="text-gray-500 text-xs mb-5">Enter the admin password to continue.</p>
+      <input type="password" id="auth-password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white text-sm mb-3 focus:border-blue-500 outline-none" />
+      <p id="auth-error" class="text-red-400 text-xs mb-3 hidden">Incorrect password. Try again.</p>
+      <button id="auth-submit" class="w-full px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">Enter</button>
+    </div>
+  </div>
+
+  <!-- Admin UI (hidden until authed) -->
+  <div id="admin-ui" class="max-w-3xl mx-auto py-10 px-4 hidden">
+    <div class="flex items-center justify-between mb-8">
+      <a href="/reading" class="text-blue-400 hover:underline text-sm">&larr; Reading List</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-white mb-8">Reading List Admin</h1>
+
+    <!-- Form -->
+    <form id="paper-form" class="bg-gray-900/50 border border-gray-800 rounded-xl p-6 mb-12 space-y-5">
+      <input type="hidden" id="edit-id" value="" />
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Title
+        <input type="text" id="f-title" placeholder="Paper title" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" required />
+      </label>
+
+      <div class="grid grid-cols-2 gap-4">
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Authors
+          <input type="text" id="f-authors" placeholder="e.g. Vaswani et al." class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+        </label>
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Year
+          <input type="text" id="f-year" placeholder="e.g. 2017" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        URL
+        <input type="url" id="f-url" placeholder="https://arxiv.org/abs/..." class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+      </label>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Status
+        <select id="f-status" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
+          {STATUSES.map(s => <option value={s}>{STATUS_LABELS[s]}</option>)}
+        </select>
+      </label>
+
+      <div>
+        <span class="text-gray-400 text-xs block mb-2">Tags</span>
+        <div id="tag-pills" class="flex flex-wrap gap-2">
+          {TAGS.map(t => (
+            <button type="button" data-tag={t} class="tag-pill px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors">
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Notes <span class="text-gray-600">(optional)</span>
+        <textarea id="f-notes" rows={2} class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 resize-y" placeholder="Key takeaways, relevance..."></textarea>
+      </label>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="btn-submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">
+          Add Paper
+        </button>
+        <button type="button" id="btn-cancel" class="px-6 py-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors text-sm hidden">
+          Cancel Edit
+        </button>
+      </div>
+    </form>
+
+    <h2 class="text-lg font-bold text-white mb-4">Papers <span id="log-count" class="text-gray-500 font-normal text-sm"></span></h2>
+    <div id="paper-list" class="space-y-3"></div>
+  </div>
+</Layout>
+
+<script>
+  import {
+    type Paper, STATUS_LABELS, STATUS_COLORS,
+    fetchPapers, createPaper, updatePaper, deletePaper,
+  } from '../../lib/reading';
+  import { verifyPassword } from '../../lib/climbing';
+
+  // Auth gate
+  const gate    = document.getElementById('auth-gate') as HTMLDivElement;
+  const adminUI = document.getElementById('admin-ui') as HTMLDivElement;
+  const authPw  = document.getElementById('auth-password') as HTMLInputElement;
+  const authErr = document.getElementById('auth-error') as HTMLParagraphElement;
+  const authBtn = document.getElementById('auth-submit') as HTMLButtonElement;
+
+  async function tryAuth() {
+    const pw = authPw.value;
+    if (!pw) return;
+    authBtn.disabled = true;
+    authBtn.textContent = 'Checking...';
+
+    const ok = await verifyPassword(pw);
+    if (ok) {
+      localStorage.setItem('admin-token', pw);
+      gate.classList.add('hidden');
+      adminUI.classList.remove('hidden');
+      await loadList();
+    } else {
+      authErr.classList.remove('hidden');
+      authPw.value = '';
+    }
+    authBtn.disabled = false;
+    authBtn.textContent = 'Enter';
+  }
+
+  authBtn.addEventListener('click', tryAuth);
+  authPw.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+
+  if (localStorage.getItem('admin-token')) {
+    gate.classList.add('hidden');
+    adminUI.classList.remove('hidden');
+    loadList();
+  }
+
+  // DOM refs
+  const form      = document.getElementById('paper-form') as HTMLFormElement;
+  const editIdEl  = document.getElementById('edit-id') as HTMLInputElement;
+  const titleEl   = document.getElementById('f-title') as HTMLInputElement;
+  const authorsEl = document.getElementById('f-authors') as HTMLInputElement;
+  const yearEl    = document.getElementById('f-year') as HTMLInputElement;
+  const urlEl     = document.getElementById('f-url') as HTMLInputElement;
+  const statusEl  = document.getElementById('f-status') as unknown as HTMLSelectElement;
+  const notesEl   = document.getElementById('f-notes') as HTMLTextAreaElement;
+  const submitBtn = document.getElementById('btn-submit') as HTMLButtonElement;
+  const cancelBtn = document.getElementById('btn-cancel') as HTMLButtonElement;
+  const paperList = document.getElementById('paper-list') as HTMLDivElement;
+  const logCount  = document.getElementById('log-count') as HTMLSpanElement;
+
+  let selectedTags: Set<string> = new Set();
+
+  // Tag pills
+  document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag!;
+      if (selectedTags.has(tag)) {
+        selectedTags.delete(tag);
+        btn.classList.remove('bg-blue-600/30', 'border-blue-500', 'text-blue-300');
+        btn.classList.add('border-gray-700', 'text-gray-400');
+      } else {
+        selectedTags.add(tag);
+        btn.classList.add('bg-blue-600/30', 'border-blue-500', 'text-blue-300');
+        btn.classList.remove('border-gray-700', 'text-gray-400');
+      }
+    });
+  });
+
+  function setTagPills(tags: string[]) {
+    selectedTags = new Set(tags);
+    document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(btn => {
+      const active = selectedTags.has(btn.dataset.tag!);
+      btn.classList.toggle('bg-blue-600/30', active);
+      btn.classList.toggle('border-blue-500', active);
+      btn.classList.toggle('text-blue-300', active);
+      btn.classList.toggle('border-gray-700', !active);
+      btn.classList.toggle('text-gray-400', !active);
+    });
+  }
+
+  // Form submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    const entry = {
+      title: titleEl.value.trim(),
+      authors: authorsEl.value.trim(),
+      year: yearEl.value.trim(),
+      url: urlEl.value.trim(),
+      status: statusEl.value,
+      tags: [...selectedTags],
+      notes: notesEl.value.trim(),
+    };
+
+    try {
+      if (editIdEl.value) {
+        await updatePaper(editIdEl.value, entry);
+      } else {
+        await createPaper(entry);
+      }
+      resetForm();
+      await loadList();
+    } catch (err: any) {
+      if (err.message === 'Unauthorized') {
+        alert('Session expired. Please re-enter the admin password.');
+        localStorage.removeItem('admin-token');
+        gate.classList.remove('hidden');
+        adminUI.classList.add('hidden');
+      } else {
+        alert('Failed to save. Please try again.');
+      }
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = editIdEl.value ? 'Save Changes' : 'Add Paper';
+  });
+
+  cancelBtn.addEventListener('click', resetForm);
+
+  function resetForm() {
+    editIdEl.value = '';
+    titleEl.value = '';
+    authorsEl.value = '';
+    yearEl.value = '';
+    urlEl.value = '';
+    statusEl.value = 'to-read';
+    notesEl.value = '';
+    selectedTags.clear();
+    setTagPills([]);
+    submitBtn.textContent = 'Add Paper';
+    cancelBtn.classList.add('hidden');
+  }
+
+  function editEntry(paper: Paper) {
+    editIdEl.value = paper.id;
+    titleEl.value = paper.title;
+    authorsEl.value = paper.authors;
+    yearEl.value = paper.year;
+    urlEl.value = paper.url;
+    statusEl.value = paper.status;
+    notesEl.value = paper.notes;
+    setTagPills(paper.tags);
+    submitBtn.textContent = 'Save Changes';
+    cancelBtn.classList.remove('hidden');
+    form.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Load & render list
+  async function loadList() {
+    const papers = await fetchPapers();
+    logCount.textContent = `(${papers.length})`;
+    paperList.innerHTML = '';
+
+    if (papers.length === 0) {
+      paperList.innerHTML = '<p class="text-gray-600 text-sm">No papers added yet.</p>';
+      return;
+    }
+
+    for (const paper of papers) {
+      const sc = STATUS_COLORS[paper.status] || STATUS_COLORS['to-read'];
+      const card = document.createElement('div');
+      card.className = 'bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex gap-4 items-start';
+      card.innerHTML = `
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-bold text-white text-sm">${paper.title}</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-medium ${sc.bg} ${sc.border} ${sc.text} border">${STATUS_LABELS[paper.status] || paper.status}</span>
+          </div>
+          <div class="text-gray-500 text-xs mt-1">
+            ${paper.authors ? `${paper.authors}` : ''}${paper.year ? ` (${paper.year})` : ''}
+          </div>
+          ${paper.url ? `<a href="${paper.url}" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 text-xs mt-1 inline-block">${paper.url}</a>` : ''}
+          ${paper.tags.length ? `<div class="flex flex-wrap gap-1 mt-1.5">${paper.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
+          ${paper.notes ? `<p class="text-gray-500 text-xs mt-1.5">${paper.notes}</p>` : ''}
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button data-edit="${paper.id}" class="text-gray-500 hover:text-blue-400 text-xs transition-colors">Edit</button>
+          <button data-del="${paper.id}" class="text-gray-500 hover:text-red-400 text-xs transition-colors">Delete</button>
+        </div>
+      `;
+
+      card.querySelector(`[data-edit="${paper.id}"]`)!.addEventListener('click', () => editEntry(paper));
+      card.querySelector(`[data-del="${paper.id}"]`)!.addEventListener('click', async () => {
+        if (!confirm(`Delete "${paper.title}"?`)) return;
+        try {
+          await deletePaper(paper.id);
+          await loadList();
+        } catch {
+          alert('Failed to delete. Session may have expired.');
+        }
+      });
+
+      paperList.appendChild(card);
+    }
+  }
+</script>
