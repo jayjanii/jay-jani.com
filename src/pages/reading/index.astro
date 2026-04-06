@@ -76,6 +76,7 @@ import Layout from '../../layouts/Layout.astro';
 
 <script>
   import { type Paper, STATUS_LABELS, STATUS_COLORS, fetchPapers } from '../../lib/reading';
+  import { renderRichText } from '../../lib/richText';
 
   const statTotal   = document.getElementById('stat-total')!;
   const statReading = document.getElementById('stat-reading')!;
@@ -229,7 +230,7 @@ import Layout from '../../layouts/Layout.astro';
               ${paper.year ? `<span class="text-gray-600">(${paper.year})</span>` : ''}
             </div>
             ${paper.tags.length ? `<div class="flex flex-wrap gap-1 mb-2">${paper.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
-            ${paper.notes ? `<p class="text-gray-500 text-xs">${paper.notes}</p>` : ''}
+            ${paper.notes ? `<div class="rich-text text-gray-500 text-xs">${renderRichText(paper.notes)}</div>` : ''}
           </div>
           ${paper.url ? `
             <a href="${paper.url}" target="_blank" rel="noopener" class="shrink-0 text-gray-500 hover:text-blue-400 transition-colors" aria-label="Open paper">

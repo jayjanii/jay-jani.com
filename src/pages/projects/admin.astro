@@ -31,10 +31,24 @@ import Layout from '../../layouts/Layout.astro';
         <input type="text" id="f-title" placeholder="Project name" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" required />
       </label>
 
-      <label class="flex flex-col gap-1 text-gray-400 text-xs">
-        Description
-        <textarea id="f-description" rows={3} class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 resize-y" placeholder="What the project does..."></textarea>
-      </label>
+      <div class="flex flex-col gap-1 text-gray-400 text-xs">
+        <span>Description</span>
+        <div class="rounded border border-gray-700 overflow-hidden bg-gray-800">
+          <div
+            id="f-description-toolbar"
+            class="flex flex-wrap gap-0.5 p-1.5 border-b border-gray-700/80 bg-gray-900/50"
+            role="toolbar"
+            aria-label="Description formatting"
+          >
+            <button type="button" data-fmt="bold" class="px-2 py-0.5 rounded text-[11px] font-bold text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Bold">B</button>
+            <button type="button" data-fmt="italic" class="px-2 py-0.5 rounded text-[11px] italic text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Italic">I</button>
+            <button type="button" data-fmt="underline" class="px-2 py-0.5 rounded text-[11px] underline text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Underline">U</button>
+            <button type="button" data-fmt="strike" class="px-2 py-0.5 rounded text-[11px] line-through text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Strikethrough">S</button>
+            <button type="button" data-fmt="code" class="px-2 py-0.5 rounded text-[11px] font-mono text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Inline code">&lt;/&gt;</button>
+          </div>
+          <textarea id="f-description" rows={4} class="w-full bg-transparent border-0 px-3 py-2 text-sm text-white placeholder-gray-600 resize-y min-h-[5rem]" placeholder="What the project does... Markdown supported."></textarea>
+        </div>
+      </div>
 
       <div class="space-y-3">
         <div class="flex items-center gap-3">
@@ -86,6 +100,7 @@ import Layout from '../../layouts/Layout.astro';
     fetchProjects, createProject, updateProject, deleteProject,
   } from '../../lib/projects';
   import { verifyPassword } from '../../lib/climbing';
+  import { attachRichTextToolbar, richTextPreviewPlain } from '../../lib/richText';
 
   // Auth gate
   const gate    = document.getElementById('auth-gate') as HTMLDivElement;
@@ -128,6 +143,8 @@ import Layout from '../../layouts/Layout.astro';
   const editIdEl     = document.getElementById('edit-id') as HTMLInputElement;
   const titleEl      = document.getElementById('f-title') as HTMLInputElement;
   const descEl       = document.getElementById('f-description') as HTMLTextAreaElement;
+  const descToolbar  = document.getElementById('f-description-toolbar') as HTMLDivElement;
+  attachRichTextToolbar(descToolbar, descEl);
   const isPrivateEl  = document.getElementById('f-is-private') as HTMLInputElement;
   const githubUrlEl  = document.getElementById('f-github-url') as HTMLInputElement;
   const githubLabel  = document.getElementById('github-url-label')!;
@@ -240,7 +257,7 @@ import Layout from '../../layouts/Layout.astro';
             <span class="font-bold text-white text-sm">${project.title}</span>
             <span class="text-gray-600 text-xs">order: ${project.sort_order}</span>
           </div>
-          ${project.description ? `<p class="text-gray-500 text-xs mt-1">${project.description.slice(0, 120)}${project.description.length > 120 ? '...' : ''}</p>` : ''}
+          ${project.description ? `<p class="text-gray-500 text-xs mt-1">${richTextPreviewPlain(project.description, 120)}</p>` : ''}
           ${meta.length ? `<div class="flex gap-3 mt-1.5 text-xs">${meta.join('')}</div>` : ''}
         </div>
         <div class="flex gap-2 shrink-0">

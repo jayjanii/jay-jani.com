@@ -11,7 +11,7 @@ import pfp from '../assets/pfp.png';
     <nav class="absolute top-12 right-4 sm:right-6 lg:right-8 z-10 flex flex-col items-end" aria-label="Site">
       <button
         id="admin-login-pill"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[102px]"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[62px]"
         style="display:none"
       >
         <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -33,7 +33,7 @@ import pfp from '../assets/pfp.png';
       </a>
       <button
         id="admin-logout-pill"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[102px]"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[62px]"
         style="display:none"
       >
         <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -118,6 +118,7 @@ import pfp from '../assets/pfp.png';
 
 <script>
   import { verifyPassword } from '../lib/climbing';
+  import { renderRichText } from '../lib/richText';
   import { type Project, fetchProjects } from '../lib/projects';
 
   // ── Copy-to-clipboard toast ──
@@ -229,7 +230,7 @@ import pfp from '../assets/pfp.png';
       article.className = 'group relative bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:bg-gray-900/60 transition-colors';
       article.innerHTML = `
         <h3 class="text-xl font-bold mb-3 text-white">${p.title}</h3>
-        ${p.description ? `<p class="text-gray-400 leading-relaxed mb-4 text-sm">${p.description}</p>` : ''}
+        ${p.description ? `<div class="rich-text text-gray-400 leading-relaxed mb-4 text-sm">${renderRichText(p.description)}</div>` : ''}
         ${links.length ? `<div class="flex gap-4 text-sm">${links.join('')}</div>` : ''}
       `;
       projectListEl.appendChild(article);

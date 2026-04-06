@@ -132,6 +132,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
     type ClimbingLog, GRADES, COLOR_HEX,
     fetchLogs, gradeToNumber, numberToGrade, linearRegression,
   } from '../../lib/climbing';
+  import { renderRichText } from '../../lib/richText';
 
   Chart.register(ScatterController, LineController, PointElement, LineElement, LinearScale, Tooltip, Legend);
 
@@ -305,7 +306,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
         </div>
         ${log.location ? `<div class="text-gray-400 mb-1">${log.location}</div>` : ''}
         ${log.tags.length ? `<div class="text-gray-500">${log.tags.join(', ')}</div>` : ''}
-        ${log.notes ? `<div class="text-gray-600 mt-1 italic">${log.notes}</div>` : ''}
+        ${log.notes ? `<div class="rich-text text-gray-600 mt-1 text-xs">${renderRichText(log.notes)}</div>` : ''}
         ${imgHtml}
       </div>
     `;
@@ -514,7 +515,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
           </div>
           ${log.location ? `<div class="text-gray-400 text-xs mb-2">${log.location}</div>` : ''}
           ${log.tags.length ? `<div class="flex flex-wrap gap-1 mb-2">${log.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
-          ${log.notes ? `<p class="text-gray-500 text-xs">${log.notes}</p>` : ''}
+          ${log.notes ? `<div class="rich-text text-gray-500 text-xs">${renderRichText(log.notes)}</div>` : ''}
           ${log.images.length > 1 ? `
             <div class="flex gap-2 mt-3">
               ${log.images.slice(1).map(src => `<img data-preview-src="${src}" data-preview-alt="climb photo" data-preview-caption="${dateStr}${log.location ? ' • ' + log.location : ''}" src="${src}" alt="climb photo" class="w-16 h-16 object-cover rounded border border-gray-700 cursor-zoom-in" />`).join('')}

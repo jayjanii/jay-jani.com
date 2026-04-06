@@ -70,10 +70,24 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
         </div>
       </div>
 
-      <label class="flex flex-col gap-1 text-gray-400 text-xs">
-        Notes <span class="text-gray-600">(optional)</span>
-        <textarea id="f-notes" rows={2} class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 resize-y" placeholder="Key takeaways, relevance..."></textarea>
-      </label>
+      <div class="flex flex-col gap-1 text-gray-400 text-xs">
+        <span>Notes <span class="text-gray-600">(optional)</span></span>
+        <div class="rounded border border-gray-700 overflow-hidden bg-gray-800">
+          <div
+            id="f-notes-toolbar"
+            class="flex flex-wrap gap-0.5 p-1.5 border-b border-gray-700/80 bg-gray-900/50"
+            role="toolbar"
+            aria-label="Notes formatting"
+          >
+            <button type="button" data-fmt="bold" class="px-2 py-0.5 rounded text-[11px] font-bold text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Bold">B</button>
+            <button type="button" data-fmt="italic" class="px-2 py-0.5 rounded text-[11px] italic text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Italic">I</button>
+            <button type="button" data-fmt="underline" class="px-2 py-0.5 rounded text-[11px] underline text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Underline">U</button>
+            <button type="button" data-fmt="strike" class="px-2 py-0.5 rounded text-[11px] line-through text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Strikethrough">S</button>
+            <button type="button" data-fmt="code" class="px-2 py-0.5 rounded text-[11px] font-mono text-gray-200 hover:bg-gray-700 border border-transparent hover:border-gray-600" title="Inline code">&lt;/&gt;</button>
+          </div>
+          <textarea id="f-notes" rows={3} class="w-full bg-transparent border-0 px-3 py-2 text-sm text-white placeholder-gray-600 resize-y min-h-[4.5rem]" placeholder="Key takeaways, relevance... Markdown: **bold**, *italic*"></textarea>
+        </div>
+      </div>
 
       <div class="flex gap-3 pt-2">
         <button type="submit" id="btn-submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">
@@ -96,6 +110,7 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
     fetchPapers, createPaper, updatePaper, deletePaper,
   } from '../../lib/reading';
   import { verifyPassword } from '../../lib/climbing';
+  import { attachRichTextToolbar, renderRichText } from '../../lib/richText';
 
   // Auth gate
   const gate    = document.getElementById('auth-gate') as HTMLDivElement;
@@ -142,6 +157,8 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
   const urlEl     = document.getElementById('f-url') as HTMLInputElement;
   const statusEl  = document.getElementById('f-status') as unknown as HTMLSelectElement;
   const notesEl   = document.getElementById('f-notes') as HTMLTextAreaElement;
+  const notesToolbar = document.getElementById('f-notes-toolbar') as HTMLDivElement;
+  attachRichTextToolbar(notesToolbar, notesEl);
   const submitBtn = document.getElementById('btn-submit') as HTMLButtonElement;
   const cancelBtn = document.getElementById('btn-cancel') as HTMLButtonElement;
   const paperList = document.getElementById('paper-list') as HTMLDivElement;
@@ -317,7 +334,7 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
           </div>
           ${paper.url ? `<a href="${paper.url}" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 text-xs mt-1 inline-block">${paper.url}</a>` : ''}
           ${paper.tags.length ? `<div class="flex flex-wrap gap-1 mt-1.5">${paper.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">${t}</span>`).join('')}</div>` : ''}
-          ${paper.notes ? `<p class="text-gray-500 text-xs mt-1.5">${paper.notes}</p>` : ''}
+          ${paper.notes ? `<div class="rich-text text-gray-500 text-xs mt-1.5">${renderRichText(paper.notes)}</div>` : ''}
         </div>
         <div class="flex gap-2 shrink-0">
           <button data-edit="${paper.id}" class="text-gray-500 hover:text-blue-400 text-xs transition-colors">Edit</button>
