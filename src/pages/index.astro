@@ -119,96 +119,37 @@ import pfp from '../assets/pfp.png';
 <script>
   import { verifyPassword } from '../lib/climbing';
   import { renderRichText } from '../lib/richText';
-  import { type Project, fetchProjects } from '../lib/projects';
+  import { fetchProjects } from '../lib/projects';
 
-  // ── Copy-to-clipboard toast ──
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
-  document.querySelectorAll<HTMLButtonElement>('.copy-email').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const email = btn.dataset.copy ?? '';
-      navigator.clipboard.writeText(email).then(() => {
-        const toast = document.getElementById('copy-toast')!;
-        toast.textContent = `Copied ${email}`;
-        toast.classList.remove('opacity-0');
-        toast.classList.add('opacity-100');
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => {
-          toast.classList.remove('opacity-100');
-          toast.classList.add('opacity-0');
-        }, 2000);
-      });
-    });
-  });
+  let homePageAbort: AbortController | null = null;
 
-  // ── Admin pills ──
-  const loginPill   = document.getElementById('admin-login-pill') as HTMLButtonElement;
-  const enterPill   = document.getElementById('admin-enter-pill') as HTMLAnchorElement;
-  const logoutPill  = document.getElementById('admin-logout-pill') as HTMLButtonElement;
-  const gate        = document.getElementById('auth-gate') as HTMLDivElement;
-  const authPw      = document.getElementById('auth-password') as HTMLInputElement;
-  const authErr     = document.getElementById('auth-error') as HTMLParagraphElement;
-  const authBtn     = document.getElementById('auth-submit') as HTMLButtonElement;
-  const cancelBtn   = document.getElementById('auth-cancel') as HTMLButtonElement;
-
-  function updatePillState() {
-    const loggedIn = !!localStorage.getItem('admin-token');
-    loginPill.style.display  = loggedIn ? 'none' : 'inline-flex';
-    enterPill.style.display  = loggedIn ? 'inline-flex' : 'none';
-    logoutPill.style.display = loggedIn ? 'inline-flex' : 'none';
+  function isHomePath() {
+    const p = location.pathname.replace(/\/$/, '') || '/';
+    return p === '/';
   }
 
-  loginPill.addEventListener('click', () => {
-    authErr.classList.add('hidden');
-    authPw.value = '';
-    gate.classList.remove('hidden');
-    authPw.focus();
-  });
-
-  logoutPill.addEventListener('click', () => {
-    localStorage.removeItem('admin-token');
-    updatePillState();
-  });
-
-  async function tryAuth() {
-    const pw = authPw.value;
-    if (!pw) return;
-    authBtn.disabled = true;
-    authBtn.textContent = 'Checking...';
-
-    const ok = await verifyPassword(pw);
-    if (ok) {
-      localStorage.setItem('admin-token', pw);
-      gate.classList.add('hidden');
-      updatePillState();
-    } else {
-      authErr.classList.remove('hidden');
-      authPw.value = '';
-    }
-    authBtn.disabled = false;
-    authBtn.textContent = 'Enter';
-  }
-
-  authBtn.addEventListener('click', tryAuth);
-  authPw.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
-  cancelBtn.addEventListener('click', () => gate.classList.add('hidden'));
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !gate.classList.contains('hidden')) gate.classList.add('hidden');
-  });
-
-  updatePillState();
-
-  // ── SVG constants for project cards ──
   const eyeSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
   const ghSvg = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>';
   const lockSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>';
 
-  // ── Dynamic project rendering ──
-  const projectListEl = document.getElementById('project-list') as HTMLDivElement;
-  const projectEmpty  = document.getElementById('project-empty') as HTMLDivElement;
+  function updatePillState() {
+    const loginPill = document.getElementById('admin-login-pill') as HTMLButtonElement | null;
+    const enterPill = document.getElementById('admin-enter-pill') as HTMLAnchorElement | null;
+    const logoutPill = document.getElementById('admin-logout-pill') as HTMLButtonElement | null;
+    if (!loginPill || !enterPill || !logoutPill) return;
+    const loggedIn = !!localStorage.getItem('admin-token');
+    loginPill.style.display = loggedIn ? 'none' : 'inline-flex';
+    enterPill.style.display = loggedIn ? 'inline-flex' : 'none';
+    logoutPill.style.display = loggedIn ? 'inline-flex' : 'none';
+  }
 
   async function loadProjects() {
-    const projects = await fetchProjects();
+    const projectListEl = document.getElementById('project-list') as HTMLDivElement | null;
+    const projectEmpty = document.getElementById('project-empty') as HTMLDivElement | null;
+    if (!projectListEl || !projectEmpty) return;
 
+    const projects = await fetchProjects();
     projectEmpty.style.display = projects.length === 0 ? 'block' : 'none';
     projectListEl.innerHTML = '';
 
@@ -237,5 +178,102 @@ import pfp from '../assets/pfp.png';
     }
   }
 
-  loadProjects();
+  function initHomePage() {
+    homePageAbort = new AbortController();
+    const { signal } = homePageAbort;
+
+    document.querySelectorAll<HTMLButtonElement>('.copy-email').forEach((btn) => {
+      btn.addEventListener(
+        'click',
+        () => {
+          const email = btn.dataset.copy ?? '';
+          navigator.clipboard.writeText(email).then(() => {
+            const toast = document.getElementById('copy-toast');
+            if (!toast) return;
+            toast.textContent = `Copied ${email}`;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+              toast.classList.remove('opacity-100');
+              toast.classList.add('opacity-0');
+            }, 2000);
+          });
+        },
+        { signal },
+      );
+    });
+
+    const loginPill = document.getElementById('admin-login-pill') as HTMLButtonElement | null;
+    const enterPill = document.getElementById('admin-enter-pill') as HTMLAnchorElement | null;
+    const logoutPill = document.getElementById('admin-logout-pill') as HTMLButtonElement | null;
+    const gate = document.getElementById('auth-gate') as HTMLDivElement | null;
+    const authPw = document.getElementById('auth-password') as HTMLInputElement | null;
+    const authErr = document.getElementById('auth-error') as HTMLParagraphElement | null;
+    const authBtn = document.getElementById('auth-submit') as HTMLButtonElement | null;
+    const cancelBtn = document.getElementById('auth-cancel') as HTMLButtonElement | null;
+
+    if (!loginPill || !enterPill || !logoutPill || !gate || !authPw || !authErr || !authBtn || !cancelBtn) {
+      return;
+    }
+
+    async function tryAuth() {
+      const pw = authPw!.value;
+      if (!pw) return;
+      authBtn!.disabled = true;
+      authBtn!.textContent = 'Checking...';
+
+      const ok = await verifyPassword(pw);
+      if (ok) {
+        localStorage.setItem('admin-token', pw);
+        gate!.classList.add('hidden');
+        updatePillState();
+      } else {
+        authErr!.classList.remove('hidden');
+        authPw!.value = '';
+      }
+      authBtn!.disabled = false;
+      authBtn!.textContent = 'Enter';
+    }
+
+    loginPill.addEventListener(
+      'click',
+      () => {
+        authErr.classList.add('hidden');
+        authPw.value = '';
+        gate.classList.remove('hidden');
+        authPw.focus();
+      },
+      { signal },
+    );
+
+    logoutPill.addEventListener(
+      'click',
+      () => {
+        localStorage.removeItem('admin-token');
+        updatePillState();
+      },
+      { signal },
+    );
+
+    authBtn.addEventListener('click', tryAuth, { signal });
+    authPw.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryAuth(); }, { signal });
+    cancelBtn.addEventListener('click', () => gate.classList.add('hidden'), { signal });
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Escape' && !gate.classList.contains('hidden')) gate.classList.add('hidden');
+      },
+      { signal },
+    );
+
+    updatePillState();
+    loadProjects();
+  }
+
+  document.addEventListener('astro:page-load', () => {
+    homePageAbort?.abort();
+    homePageAbort = null;
+    if (isHomePath()) initHomePage();
+  });
 </script>
