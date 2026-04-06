@@ -1,11 +1,9 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 
-export const prerender = false;
+import { checkAdminAuth } from '../../../lib/server/auth';
 
-function checkAuth(request: Request, password: string): boolean {
-  return request.headers.get('Authorization') === `Bearer ${password}`;
-}
+export const prerender = false;
 
 export const GET: APIRoute = async () => {
   const { DB } = env as unknown as { DB: D1Database };
@@ -30,7 +28,7 @@ export const GET: APIRoute = async () => {
 
 export const POST: APIRoute = async ({ request }) => {
   const { DB, ADMIN_PASSWORD } = env as unknown as { DB: D1Database; ADMIN_PASSWORD: string };
-  if (!checkAuth(request, ADMIN_PASSWORD)) {
+  if (!checkAdminAuth(request, ADMIN_PASSWORD)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 

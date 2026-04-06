@@ -1,5 +1,6 @@
 {
   "name": "real-personal",
+  "description": "Personal Astro site on Cloudflare: portfolio, Three.js demos, D1-backed climbing log, reading list, and projects.",
   "type": "module",
   "version": "0.0.1",
   "engines": {

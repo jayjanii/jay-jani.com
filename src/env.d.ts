@@ -1,6 +1,6 @@
 /// <reference path="../.astro/types.d.ts" />
 
-// Cloudflare Workers env bindings used via `import { env } from "cloudflare:workers"`
+/** D1 + secrets available on Workers (API routes). Set `ADMIN_PASSWORD` in Cloudflare / `.dev.vars`. */
 interface CloudflareEnv {
   DB: D1Database;
   ADMIN_PASSWORD: string;

@@ -1,8 +1,8 @@
+# Cloudflare Workers/Pages — D1 binding for Astro API routes (`env.DB` in code).
+# Replace `database_id` with yours after: npx wrangler d1 create <name>
 name = "real-personal"
 compatibility_date = "2024-12-01"
 
-# After creating the database, replace the database_id below:
-#   npx wrangler d1 create climbing-logs
 [[d1_databases]]
 binding = "DB"
 database_name = "climbing-logs"

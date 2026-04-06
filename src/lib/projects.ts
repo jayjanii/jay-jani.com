@@ -1,3 +1,4 @@
+/** Types and browser client for `/api/projects` (homepage cards + admin). */
 export interface Project {
   id: string;
   title: string;

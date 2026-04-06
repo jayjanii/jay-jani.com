@@ -1,3 +1,4 @@
+/** Types, labels, and browser client for `/api/papers`. */
 export interface Paper {
   id: string;
   title: string;
