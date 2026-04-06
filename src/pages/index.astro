@@ -8,10 +8,19 @@ import pfp from '../assets/pfp.png';
   <div class="relative max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
     
     <!-- Top Nav: absolute so it does not shift the main column -->
-    <nav class="absolute top-12 right-4 sm:right-6 lg:right-8 z-10 flex flex-col gap-2 items-end" aria-label="Site">
+    <nav class="absolute top-12 right-4 sm:right-6 lg:right-8 z-10 flex flex-col items-end" aria-label="Site">
+      <button
+        id="admin-pill"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[68px]"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <span id="admin-pill-label">Admin</span>
+      </button>
       <a
         href="/reading"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 shadow-sm hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 shadow-sm hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors mb-2"
       >
         <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -28,6 +37,20 @@ import pfp from '../assets/pfp.png';
         Climbing Log
       </a>
     </nav>
+
+    <!-- Auth gate modal -->
+    <div id="auth-gate" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+      <div class="bg-gray-900 border border-gray-700 rounded-xl p-8 max-w-sm w-full mx-4">
+        <h2 class="text-lg font-bold text-white mb-1">Admin Access</h2>
+        <p class="text-gray-500 text-xs mb-5">Enter the admin password to continue.</p>
+        <input type="password" id="auth-password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white text-sm mb-3 focus:border-blue-500 outline-none" />
+        <p id="auth-error" class="text-red-400 text-xs mb-3 hidden">Incorrect password. Try again.</p>
+        <div class="flex gap-3">
+          <button id="auth-submit" class="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">Enter</button>
+          <button id="auth-cancel" class="px-4 py-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Profile Section -->
     <section class="flex flex-col md:flex-row items-center md:items-start gap-8 mb-16">
@@ -130,6 +153,8 @@ import pfp from '../assets/pfp.png';
 </Layout>
 
 <script>
+  import { verifyPassword } from '../lib/climbing';
+
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   document.querySelectorAll<HTMLButtonElement>('.copy-email').forEach((btn) => {
@@ -148,4 +173,57 @@ import pfp from '../assets/pfp.png';
       });
     });
   });
+
+  const adminPill  = document.getElementById('admin-pill') as HTMLButtonElement;
+  const pillLabel  = document.getElementById('admin-pill-label')!;
+  const gate       = document.getElementById('auth-gate') as HTMLDivElement;
+  const authPw     = document.getElementById('auth-password') as HTMLInputElement;
+  const authErr    = document.getElementById('auth-error') as HTMLParagraphElement;
+  const authBtn    = document.getElementById('auth-submit') as HTMLButtonElement;
+  const cancelBtn  = document.getElementById('auth-cancel') as HTMLButtonElement;
+
+  function updatePillState() {
+    const loggedIn = !!localStorage.getItem('admin-token');
+    pillLabel.textContent = loggedIn ? 'Log Out' : 'Admin';
+  }
+
+  adminPill.addEventListener('click', () => {
+    if (localStorage.getItem('admin-token')) {
+      localStorage.removeItem('admin-token');
+      updatePillState();
+    } else {
+      authErr.classList.add('hidden');
+      authPw.value = '';
+      gate.classList.remove('hidden');
+      authPw.focus();
+    }
+  });
+
+  async function tryAuth() {
+    const pw = authPw.value;
+    if (!pw) return;
+    authBtn.disabled = true;
+    authBtn.textContent = 'Checking...';
+
+    const ok = await verifyPassword(pw);
+    if (ok) {
+      localStorage.setItem('admin-token', pw);
+      gate.classList.add('hidden');
+      updatePillState();
+    } else {
+      authErr.classList.remove('hidden');
+      authPw.value = '';
+    }
+    authBtn.disabled = false;
+    authBtn.textContent = 'Enter';
+  }
+
+  authBtn.addEventListener('click', tryAuth);
+  authPw.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+  cancelBtn.addEventListener('click', () => gate.classList.add('hidden'));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !gate.classList.contains('hidden')) gate.classList.add('hidden');
+  });
+
+  updatePillState();
 </script>
