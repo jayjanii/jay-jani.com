@@ -20,6 +20,7 @@ export const GET: APIRoute = async () => {
     status: r.status,
     tags: JSON.parse(r.tags),
     notes: r.notes,
+    created_at: r.created_at,
   }));
 
   return new Response(JSON.stringify(papers), {

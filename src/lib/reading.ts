@@ -7,6 +7,7 @@ export interface Paper {
   status: string;
   tags: string[];
   notes: string;
+  created_at?: string;
 }
 
 export const STATUSES = ['to-read', 'reading', 'read'] as const;

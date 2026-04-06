@@ -64,6 +64,10 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
             </button>
           ))}
         </div>
+        <div class="flex gap-2 mt-3">
+          <input type="text" id="f-custom-tag" placeholder="Add custom tag..." class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-white placeholder-gray-600 flex-1" />
+          <button type="button" id="btn-add-tag" class="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-400 rounded hover:border-blue-500 hover:text-blue-400 transition-colors text-xs">Add</button>
+        </div>
       </div>
 
       <label class="flex flex-col gap-1 text-gray-400 text-xs">
@@ -88,7 +92,7 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
 
 <script>
   import {
-    type Paper, STATUS_LABELS, STATUS_COLORS,
+    type Paper, STATUS_LABELS, STATUS_COLORS, TAGS as PRESET_TAGS,
     fetchPapers, createPaper, updatePaper, deletePaper,
   } from '../../lib/reading';
   import { verifyPassword } from '../../lib/climbing';
@@ -144,9 +148,11 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
   const logCount  = document.getElementById('log-count') as HTMLSpanElement;
 
   let selectedTags: Set<string> = new Set();
+  const tagPillsContainer = document.getElementById('tag-pills') as HTMLDivElement;
+  const customTagInput = document.getElementById('f-custom-tag') as HTMLInputElement;
+  const addTagBtn = document.getElementById('btn-add-tag') as HTMLButtonElement;
 
-  // Tag pills
-  document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(btn => {
+  function bindPill(btn: HTMLButtonElement) {
     btn.addEventListener('click', () => {
       const tag = btn.dataset.tag!;
       if (selectedTags.has(tag)) {
@@ -159,6 +165,34 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
         btn.classList.remove('border-gray-700', 'text-gray-400');
       }
     });
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(bindPill);
+
+  function addCustomTag(tag: string) {
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+    const existing = tagPillsContainer.querySelector(`[data-tag="${CSS.escape(trimmed)}"]`);
+    if (existing) {
+      if (!selectedTags.has(trimmed)) (existing as HTMLButtonElement).click();
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.tag = trimmed;
+    btn.className = 'tag-pill px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors';
+    btn.textContent = trimmed;
+    selectedTags.add(trimmed);
+    bindPill(btn);
+    tagPillsContainer.appendChild(btn);
+  }
+
+  addTagBtn.addEventListener('click', () => {
+    addCustomTag(customTagInput.value);
+    customTagInput.value = '';
+  });
+  customTagInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addCustomTag(customTagInput.value); customTagInput.value = ''; }
   });
 
   function setTagPills(tags: string[]) {
@@ -171,6 +205,17 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
       btn.classList.toggle('border-gray-700', !active);
       btn.classList.toggle('text-gray-400', !active);
     });
+    for (const tag of tags) {
+      if (!tagPillsContainer.querySelector(`[data-tag="${CSS.escape(tag)}"]`)) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.tag = tag;
+        btn.className = 'tag-pill px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors';
+        btn.textContent = tag;
+        bindPill(btn);
+        tagPillsContainer.appendChild(btn);
+      }
+    }
   }
 
   // Form submit
@@ -223,6 +268,10 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
     statusEl.value = 'to-read';
     notesEl.value = '';
     selectedTags.clear();
+    const presetSet = new Set(PRESET_TAGS);
+    tagPillsContainer.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(btn => {
+      if (!presetSet.has(btn.dataset.tag!)) btn.remove();
+    });
     setTagPills([]);
     submitBtn.textContent = 'Add Paper';
     cancelBtn.classList.add('hidden');

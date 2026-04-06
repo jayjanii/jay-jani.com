@@ -1,10 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { TAGS } from '../../lib/reading';
 ---
 
 <Layout title="Reading List - Jay Jani">
-  <div class="max-w-4xl mx-auto py-10 px-4">
+  <div class="max-w-4xl w-full mx-auto py-10 px-4 min-w-0">
     <div class="flex items-center justify-between mb-8">
       <a href="/" class="text-blue-400 hover:underline text-sm">&larr; Home</a>
       <div id="admin-bar" class="flex items-center gap-2">
@@ -20,38 +19,53 @@ import { TAGS } from '../../lib/reading';
     <!-- Stats Bar -->
     <div id="stats" class="grid grid-cols-3 gap-3 mb-8">
       <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
-        <div id="stat-total" class="text-2xl font-bold text-white">0</div>
+        <div id="stat-total" class="text-2xl font-bold text-white tabular-nums">0</div>
         <div class="text-gray-500 text-xs mt-1">Total Papers</div>
       </div>
       <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
-        <div id="stat-reading" class="text-2xl font-bold text-blue-300">0</div>
+        <div id="stat-reading" class="text-2xl font-bold text-blue-300 tabular-nums">0</div>
         <div class="text-gray-500 text-xs mt-1">Currently Reading</div>
       </div>
       <div class="bg-gray-900/50 border border-gray-800 rounded-lg p-4 text-center">
-        <div id="stat-read" class="text-2xl font-bold text-green-300">0</div>
+        <div id="stat-read" class="text-2xl font-bold text-green-300 tabular-nums">0</div>
         <div class="text-gray-500 text-xs mt-1">Finished</div>
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="flex flex-wrap items-center gap-3 mb-6">
-      <div id="status-btns" class="flex gap-1">
+    <div class="flex flex-wrap items-center gap-3 mb-8 w-full min-w-0">
+      <div class="flex gap-1 shrink-0">
         <button data-status="" class="status-btn px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors">All</button>
         <button data-status="to-read" class="status-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">To Read</button>
         <button data-status="reading" class="status-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">Reading</button>
         <button data-status="read" class="status-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">Read</button>
       </div>
-    </div>
 
-    <div id="tag-filter" class="flex flex-wrap gap-1.5 mb-8">
-      <button data-ftag="" class="ftag-btn px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors">All Tags</button>
-      {TAGS.map(t => (
-        <button data-ftag={t} class="ftag-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">{t}</button>
-      ))}
+      <!-- Tag dropdown -->
+      <div class="relative shrink-0" id="tag-filter-wrap">
+        <button id="tag-filter-btn" type="button" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500 transition-colors flex items-center justify-between gap-1.5 min-w-[9.5rem]">
+          <span id="tag-filter-label">Tags</span>
+          <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <div id="tag-panel" class="absolute left-0 top-full mt-1 hidden z-20 bg-gray-900 border border-gray-700 rounded-xl p-3 shadow-xl min-w-[220px] max-h-[300px] overflow-y-auto">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] text-gray-500 uppercase tracking-wider">Filter by tag</span>
+            <button id="tag-clear-btn" class="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">Clear</button>
+          </div>
+          <div id="tag-checkbox-list" class="flex flex-col gap-1"></div>
+        </div>
+      </div>
+
+      <!-- Sort -->
+      <div class="flex gap-1 shrink-0">
+        <button data-sort="status" class="sort-btn px-3 py-1 rounded-full text-xs border bg-blue-600/30 border-blue-500 text-blue-300 transition-colors">Status</button>
+        <button data-sort="newest" class="sort-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">Newest</button>
+        <button data-sort="oldest" class="sort-btn px-3 py-1 rounded-full text-xs border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors">Oldest</button>
+      </div>
     </div>
 
     <!-- Paper List -->
-    <div id="paper-list" class="space-y-3"></div>
+    <div id="paper-list" class="space-y-3 w-full min-w-0"></div>
 
     <!-- Empty state -->
     <div id="empty-state" class="text-center py-16 hidden">
@@ -70,7 +84,8 @@ import { TAGS } from '../../lib/reading';
   const emptyState  = document.getElementById('empty-state') as HTMLDivElement;
 
   let activeStatus = '';
-  let activeTag = '';
+  let activeTags = new Set<string>();
+  let activeSort = 'status';
   let allPapers: Paper[] = [];
 
   function activateBtn(selector: string, attr: string, value: string) {
@@ -87,14 +102,80 @@ import { TAGS } from '../../lib/reading';
   document.querySelectorAll<HTMLButtonElement>('.status-btn').forEach(btn =>
     btn.addEventListener('click', () => { activeStatus = btn.dataset.status!; activateBtn('.status-btn', 'data-status', activeStatus); applyFilters(); })
   );
-  document.querySelectorAll<HTMLButtonElement>('.ftag-btn').forEach(btn =>
-    btn.addEventListener('click', () => { activeTag = btn.dataset.ftag!; activateBtn('.ftag-btn', 'data-ftag', activeTag); applyFilters(); })
+  document.querySelectorAll<HTMLButtonElement>('.sort-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeSort = btn.dataset.sort!; activateBtn('.sort-btn', 'data-sort', activeSort); applyFilters(); })
   );
+
+  // Tag dropdown
+  const tagFilterBtn   = document.getElementById('tag-filter-btn') as HTMLButtonElement;
+  const tagPanel       = document.getElementById('tag-panel') as HTMLDivElement;
+  const tagFilterWrap  = document.getElementById('tag-filter-wrap') as HTMLDivElement;
+  const tagFilterLabel = document.getElementById('tag-filter-label') as HTMLSpanElement;
+  const tagClearBtn    = document.getElementById('tag-clear-btn') as HTMLButtonElement;
+  const tagCheckboxList = document.getElementById('tag-checkbox-list') as HTMLDivElement;
+
+  tagFilterBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    tagPanel.classList.toggle('hidden');
+  });
+  document.addEventListener('click', (e) => {
+    if (!tagFilterWrap.contains(e.target as Node)) tagPanel.classList.add('hidden');
+  });
+
+  function updateTagLabel() {
+    tagFilterLabel.textContent = activeTags.size > 0 ? `Tags (${activeTags.size})` : 'Tags';
+    tagFilterBtn.classList.toggle('border-blue-500', activeTags.size > 0);
+    tagFilterBtn.classList.toggle('text-blue-300', activeTags.size > 0);
+    tagFilterBtn.classList.toggle('border-gray-700', activeTags.size === 0);
+    tagFilterBtn.classList.toggle('text-gray-300', activeTags.size === 0);
+  }
+
+  tagClearBtn.addEventListener('click', () => {
+    activeTags.clear();
+    tagCheckboxList.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => {
+      cb.checked = false;
+      const label = cb.closest('label') as HTMLLabelElement | null;
+      if (label) {
+        label.classList.remove('bg-blue-600/30', 'border-blue-500', 'text-blue-300');
+        label.classList.add('border-gray-700', 'text-gray-400');
+      }
+    });
+    updateTagLabel();
+    applyFilters();
+  });
+
+  function buildTagCheckboxes() {
+    const allTags = [...new Set(allPapers.flatMap(p => p.tags))].sort();
+    tagCheckboxList.innerHTML = '';
+    for (const tag of allTags) {
+      const label = document.createElement('label');
+      label.className = 'flex items-center justify-center px-2 py-1 rounded border border-gray-700 text-xs text-gray-400 cursor-pointer hover:border-gray-500 transition-colors';
+      label.innerHTML = `<input type="checkbox" class="tag-cb sr-only" value="${tag}" />${tag}`;
+      const cb = label.querySelector('input')! as HTMLInputElement;
+      if (activeTags.has(tag)) {
+        cb.checked = true;
+        label.classList.add('bg-blue-600/30', 'border-blue-500', 'text-blue-300');
+        label.classList.remove('border-gray-700', 'text-gray-400');
+      }
+      cb.addEventListener('change', () => {
+        if (cb.checked) activeTags.add(tag);
+        else activeTags.delete(tag);
+        label.classList.toggle('bg-blue-600/30', cb.checked);
+        label.classList.toggle('border-blue-500', cb.checked);
+        label.classList.toggle('text-blue-300', cb.checked);
+        label.classList.toggle('border-gray-700', !cb.checked);
+        label.classList.toggle('text-gray-400', !cb.checked);
+        updateTagLabel();
+        applyFilters();
+      });
+      tagCheckboxList.appendChild(label);
+    }
+  }
 
   function applyFilters() {
     const filtered = allPapers.filter(p => {
       if (activeStatus && p.status !== activeStatus) return false;
-      if (activeTag && !p.tags.includes(activeTag)) return false;
+      if (activeTags.size > 0 && !p.tags.some(t => activeTags.has(t))) return false;
       return true;
     });
 
@@ -113,21 +194,28 @@ import { TAGS } from '../../lib/reading';
     paperList.innerHTML = '';
 
     if (papers.length === 0 && allPapers.length > 0) {
-      paperList.innerHTML = '<p class="text-gray-600 text-sm">No papers match the current filters.</p>';
+      paperList.innerHTML = '<p class="text-gray-600 text-sm w-full min-w-0">No papers match the current filters.</p>';
       return;
     }
 
-    const statusOrder = ['reading', 'to-read', 'read'];
-    const sorted = [...papers].sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+    const sorted = [...papers];
+    if (activeSort === 'newest') {
+      sorted.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+    } else if (activeSort === 'oldest') {
+      sorted.sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
+    } else {
+      const statusOrder = ['reading', 'to-read', 'read'];
+      sorted.sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+    }
 
     for (const paper of sorted) {
       const sc = STATUS_COLORS[paper.status] || STATUS_COLORS['to-read'];
       const card = document.createElement('article');
-      card.className = 'bg-gray-900/40 border border-gray-800 rounded-xl p-5 hover:bg-gray-900/60 transition-colors';
+      card.className = 'w-full min-w-0 bg-gray-900/40 border border-gray-800 rounded-xl p-5 hover:bg-gray-900/60 transition-colors';
 
       const titleHtml = paper.url
-        ? `<a href="${paper.url}" target="_blank" rel="noopener" class="text-white font-bold text-sm hover:text-blue-300 transition-colors">${paper.title}</a>`
-        : `<span class="text-white font-bold text-sm">${paper.title}</span>`;
+        ? `<a href="${paper.url}" target="_blank" rel="noopener" class="text-white font-bold text-sm hover:text-blue-300 transition-colors break-words">${paper.title}</a>`
+        : `<span class="text-white font-bold text-sm break-words">${paper.title}</span>`;
 
       card.innerHTML = `
         <div class="flex items-start gap-3">
@@ -157,6 +245,7 @@ import { TAGS } from '../../lib/reading';
 
   async function init() {
     allPapers = await fetchPapers();
+    buildTagCheckboxes();
     applyFilters();
   }
 
