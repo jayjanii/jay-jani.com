@@ -8,9 +8,9 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
     <div class="flex items-center justify-between mb-8">
       <a href="/" class="text-blue-400 hover:underline text-sm">&larr; Home</a>
       <div id="admin-bar" class="flex items-center gap-2">
-        <a id="admin-enter" href="/climbing/admin" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors">Enter Dashboard</a>
-        <button id="admin-logout" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer">Log Out</button>
-        <a id="admin-login-link" href="/climbing/admin" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">Admin</a>
+        <a id="admin-enter" href="/climbing/admin" style="display:none" class="items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors">Enter Dashboard</a>
+        <button id="admin-logout" style="display:none" class="items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer">Log Out</button>
+        <a id="admin-login-link" style="display:none" class="items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">Admin</a>
       </div>
     </div>
 
@@ -136,6 +136,21 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
 
   Chart.register(ScatterController, LineController, PointElement, LineElement, LinearScale, Tooltip, Legend);
 
+  let climbPageAbort: AbortController | null = null;
+  let chart: Chart | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    climbPageAbort?.abort();
+    climbPageAbort = null;
+    if (chart) { chart.destroy(); chart = null; }
+    const p = location.pathname.replace(/\/$/, '') || '/';
+    if (p === '/climbing') initClimbingPage();
+  });
+
+  function initClimbingPage() {
+  climbPageAbort = new AbortController();
+  const { signal } = climbPageAbort;
+
   const chartCanvas  = document.getElementById('climb-chart') as HTMLCanvasElement;
   const tooltipEl    = document.getElementById('chart-tooltip') as HTMLDivElement;
   const statTotal    = document.getElementById('stat-total')!;
@@ -192,7 +207,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
   imgModalClose.addEventListener('click', closeImgModal);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !imgModal.classList.contains('hidden')) closeImgModal();
-  });
+  }, { signal });
 
   // ── Toggle helpers ──
   function activateBtn(selector: string, attr: string, value: string) {
@@ -243,7 +258,7 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
     if (!gradeFilterWrap.contains(e.target as Node)) {
       gradePanel.classList.add('hidden');
     }
-  });
+  }, { signal });
 
   document.querySelectorAll<HTMLInputElement>('.grade-cb').forEach(cb => {
     cb.addEventListener('change', () => {
@@ -322,9 +337,6 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
     tooltipEl.style.top = top + 'px';
     tooltipEl.style.transform = 'translate(-50%, calc(-100% - 12px))';
   }
-
-  // ── Chart ──
-  let chart: Chart | null = null;
 
   let allLogs: ClimbingLog[] = [];
 
@@ -558,5 +570,6 @@ import { HOLD_COLORS, TAGS } from '../../lib/climbing';
   });
 
   updateAdminBar();
+  }
 </script>
 

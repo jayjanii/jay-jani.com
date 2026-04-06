@@ -223,12 +223,17 @@ import pfp from '../assets/pfp.png';
       authBtn!.disabled = true;
       authBtn!.textContent = 'Checking...';
 
-      const ok = await verifyPassword(pw);
-      if (ok) {
-        localStorage.setItem('admin-token', pw);
-        gate!.classList.add('hidden');
-        updatePillState();
-      } else {
+      try {
+        const ok = await verifyPassword(pw);
+        if (ok) {
+          localStorage.setItem('admin-token', pw);
+          gate!.classList.add('hidden');
+          updatePillState();
+        } else {
+          authErr!.classList.remove('hidden');
+          authPw!.value = '';
+        }
+      } catch {
         authErr!.classList.remove('hidden');
         authPw!.value = '';
       }

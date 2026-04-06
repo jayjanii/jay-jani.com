@@ -113,7 +113,18 @@ import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
   } from '../../lib/climbing';
   import { attachRichTextToolbar, renderRichText } from '../../lib/richText';
 
-  // ── Auth gate ──────────────────────────────────────
+  let climbAdminAbort: AbortController | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    climbAdminAbort?.abort();
+    climbAdminAbort = null;
+    const p = location.pathname.replace(/\/$/, '') || '/';
+    if (p === '/climbing/admin') initClimbAdminPage();
+  });
+
+  function initClimbAdminPage() {
+  climbAdminAbort = new AbortController();
+
   const gate      = document.getElementById('auth-gate') as HTMLDivElement;
   const adminUI   = document.getElementById('admin-ui') as HTMLDivElement;
   const authPw    = document.getElementById('auth-password') as HTMLInputElement;
@@ -126,13 +137,18 @@ import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
     authBtn.disabled = true;
     authBtn.textContent = 'Checking...';
 
-    const ok = await verifyPassword(pw);
-    if (ok) {
-      localStorage.setItem('admin-token', pw);
-      gate.classList.add('hidden');
-      adminUI.classList.remove('hidden');
-      await loadList();
-    } else {
+    try {
+      const ok = await verifyPassword(pw);
+      if (ok) {
+        localStorage.setItem('admin-token', pw);
+        gate.classList.add('hidden');
+        adminUI.classList.remove('hidden');
+        await loadList();
+      } else {
+        authErr.classList.remove('hidden');
+        authPw.value = '';
+      }
+    } catch {
       authErr.classList.remove('hidden');
       authPw.value = '';
     }
@@ -355,5 +371,6 @@ import { GRADES, HOLD_COLORS, TAGS } from '../../lib/climbing';
 
       logList.appendChild(card);
     }
+  }
   }
 </script>

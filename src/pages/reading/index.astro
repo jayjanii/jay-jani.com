@@ -7,9 +7,9 @@ import Layout from '../../layouts/Layout.astro';
     <div class="flex items-center justify-between mb-8">
       <a href="/" class="text-blue-400 hover:underline text-sm">&larr; Home</a>
       <div id="admin-bar" class="flex items-center gap-2">
-        <a id="admin-enter" href="/reading/admin" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors">Enter Dashboard</a>
-        <button id="admin-logout" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer">Log Out</button>
-        <a id="admin-login-link" href="/reading/admin" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">Admin</a>
+        <a id="admin-enter" href="/reading/admin" style="display:none" class="items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors">Enter Dashboard</a>
+        <button id="admin-logout" style="display:none" class="items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer">Log Out</button>
+        <a id="admin-login-link" style="display:none" class="items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">Admin</a>
       </div>
     </div>
 
@@ -78,6 +78,19 @@ import Layout from '../../layouts/Layout.astro';
   import { type Paper, STATUS_LABELS, STATUS_COLORS, fetchPapers } from '../../lib/reading';
   import { renderRichText } from '../../lib/richText';
 
+  let readingPageAbort: AbortController | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    readingPageAbort?.abort();
+    readingPageAbort = null;
+    const p = location.pathname.replace(/\/$/, '') || '/';
+    if (p === '/reading') initReadingPage();
+  });
+
+  function initReadingPage() {
+  readingPageAbort = new AbortController();
+  const { signal } = readingPageAbort;
+
   const statTotal   = document.getElementById('stat-total')!;
   const statReading = document.getElementById('stat-reading')!;
   const statRead    = document.getElementById('stat-read')!;
@@ -121,7 +134,7 @@ import Layout from '../../layouts/Layout.astro';
   });
   document.addEventListener('click', (e) => {
     if (!tagFilterWrap.contains(e.target as Node)) tagPanel.classList.add('hidden');
-  });
+  }, { signal });
 
   function updateTagLabel() {
     tagFilterLabel.textContent = activeTags.size > 0 ? `Tags (${activeTags.size})` : 'Tags';
@@ -269,4 +282,5 @@ import Layout from '../../layouts/Layout.astro';
   });
 
   updateAdminBar();
+  }
 </script>

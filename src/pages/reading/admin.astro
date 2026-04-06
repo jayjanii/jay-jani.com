@@ -112,7 +112,18 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
   import { verifyPassword } from '../../lib/climbing';
   import { attachRichTextToolbar, renderRichText } from '../../lib/richText';
 
-  // Auth gate
+  let readAdminAbort: AbortController | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    readAdminAbort?.abort();
+    readAdminAbort = null;
+    const p = location.pathname.replace(/\/$/, '') || '/';
+    if (p === '/reading/admin') initReadAdminPage();
+  });
+
+  function initReadAdminPage() {
+  readAdminAbort = new AbortController();
+
   const gate    = document.getElementById('auth-gate') as HTMLDivElement;
   const adminUI = document.getElementById('admin-ui') as HTMLDivElement;
   const authPw  = document.getElementById('auth-password') as HTMLInputElement;
@@ -125,13 +136,18 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
     authBtn.disabled = true;
     authBtn.textContent = 'Checking...';
 
-    const ok = await verifyPassword(pw);
-    if (ok) {
-      localStorage.setItem('admin-token', pw);
-      gate.classList.add('hidden');
-      adminUI.classList.remove('hidden');
-      await loadList();
-    } else {
+    try {
+      const ok = await verifyPassword(pw);
+      if (ok) {
+        localStorage.setItem('admin-token', pw);
+        gate.classList.add('hidden');
+        adminUI.classList.remove('hidden');
+        await loadList();
+      } else {
+        authErr.classList.remove('hidden');
+        authPw.value = '';
+      }
+    } catch {
       authErr.classList.remove('hidden');
       authPw.value = '';
     }
@@ -355,5 +371,6 @@ import { STATUSES, STATUS_LABELS, TAGS } from '../../lib/reading';
 
       paperList.appendChild(card);
     }
+  }
   }
 </script>
