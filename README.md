@@ -1,4 +1,4 @@
-# jay-jani.com
+# [jay-jani.com](jay-jani.com)
 
 A personal site built with Astro and deployed on Cloudflare Pages. The homepage introduces the author and surfaces project cards (backed by D1). Standalone pages host heavier client-side work: a full-screen N-body / gravity simulation in Three.js, and an attention-visualization walkthrough for a Vision Transformer that uses Chart.js. Three small “apps” share the same stack pattern; public reads from SQLite via Workers, writes gated by a single admin password verified on the server, with the browser sending `Authorization: Bearer …` after a successful `POST /api/auth`. That design is deliberate simplicity for a single maintainer, not a general auth product.
 
