@@ -1,0 +1,266 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Projects Admin - Jay Jani">
+  <!-- Auth gate overlay -->
+  <div id="auth-gate" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-8 max-w-sm w-full mx-4">
+      <h2 class="text-lg font-bold text-white mb-1">Admin Access</h2>
+      <p class="text-gray-500 text-xs mb-5">Enter the admin password to continue.</p>
+      <input type="password" id="auth-password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white text-sm mb-3 focus:border-blue-500 outline-none" />
+      <p id="auth-error" class="text-red-400 text-xs mb-3 hidden">Incorrect password. Try again.</p>
+      <button id="auth-submit" class="w-full px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">Enter</button>
+    </div>
+  </div>
+
+  <!-- Admin UI (hidden until authed) -->
+  <div id="admin-ui" class="max-w-3xl mx-auto py-10 px-4 hidden">
+    <div class="flex items-center justify-between mb-8">
+      <a href="/" class="text-blue-400 hover:underline text-sm">&larr; Home</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-white mb-8">Projects Admin</h1>
+
+    <!-- Form -->
+    <form id="project-form" class="bg-gray-900/50 border border-gray-800 rounded-xl p-6 mb-12 space-y-5">
+      <input type="hidden" id="edit-id" value="" />
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Title
+        <input type="text" id="f-title" placeholder="Project name" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" required />
+      </label>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Description
+        <textarea id="f-description" rows={3} class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 resize-y" placeholder="What the project does..."></textarea>
+      </label>
+
+      <div class="space-y-3">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 text-gray-400 text-xs cursor-pointer">
+            <input type="checkbox" id="f-is-private" class="accent-red-500" />
+            Source is private
+          </label>
+        </div>
+        <label id="github-url-label" class="flex flex-col gap-1 text-gray-400 text-xs">
+          GitHub URL
+          <input type="url" id="f-github-url" placeholder="https://github.com/..." class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Demo / Page URL <span class="text-gray-600">(optional)</span>
+          <input type="text" id="f-demo-url" placeholder="/attention or https://..." class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+        </label>
+        <label class="flex flex-col gap-1 text-gray-400 text-xs">
+          Demo Link Label <span class="text-gray-600">(optional)</span>
+          <input type="text" id="f-demo-label" placeholder="e.g. View Write-up" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600" />
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1 text-gray-400 text-xs">
+        Sort Order <span class="text-gray-600">(lower = higher on page)</span>
+        <input type="number" id="f-sort-order" value="0" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-24" />
+      </label>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="btn-submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors text-sm">
+          Add Project
+        </button>
+        <button type="button" id="btn-cancel" class="px-6 py-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors text-sm hidden">
+          Cancel Edit
+        </button>
+      </div>
+    </form>
+
+    <h2 class="text-lg font-bold text-white mb-4">Projects <span id="log-count" class="text-gray-500 font-normal text-sm"></span></h2>
+    <div id="project-list" class="space-y-3"></div>
+  </div>
+</Layout>
+
+<script>
+  import {
+    type Project,
+    fetchProjects, createProject, updateProject, deleteProject,
+  } from '../../lib/projects';
+  import { verifyPassword } from '../../lib/climbing';
+
+  // Auth gate
+  const gate    = document.getElementById('auth-gate') as HTMLDivElement;
+  const adminUI = document.getElementById('admin-ui') as HTMLDivElement;
+  const authPw  = document.getElementById('auth-password') as HTMLInputElement;
+  const authErr = document.getElementById('auth-error') as HTMLParagraphElement;
+  const authBtn = document.getElementById('auth-submit') as HTMLButtonElement;
+
+  async function tryAuth() {
+    const pw = authPw.value;
+    if (!pw) return;
+    authBtn.disabled = true;
+    authBtn.textContent = 'Checking...';
+
+    const ok = await verifyPassword(pw);
+    if (ok) {
+      localStorage.setItem('admin-token', pw);
+      gate.classList.add('hidden');
+      adminUI.classList.remove('hidden');
+      await loadList();
+    } else {
+      authErr.classList.remove('hidden');
+      authPw.value = '';
+    }
+    authBtn.disabled = false;
+    authBtn.textContent = 'Enter';
+  }
+
+  authBtn.addEventListener('click', tryAuth);
+  authPw.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+
+  if (localStorage.getItem('admin-token')) {
+    gate.classList.add('hidden');
+    adminUI.classList.remove('hidden');
+    loadList();
+  }
+
+  // DOM refs
+  const form         = document.getElementById('project-form') as HTMLFormElement;
+  const editIdEl     = document.getElementById('edit-id') as HTMLInputElement;
+  const titleEl      = document.getElementById('f-title') as HTMLInputElement;
+  const descEl       = document.getElementById('f-description') as HTMLTextAreaElement;
+  const isPrivateEl  = document.getElementById('f-is-private') as HTMLInputElement;
+  const githubUrlEl  = document.getElementById('f-github-url') as HTMLInputElement;
+  const githubLabel  = document.getElementById('github-url-label')!;
+  const demoUrlEl    = document.getElementById('f-demo-url') as HTMLInputElement;
+  const demoLabelEl  = document.getElementById('f-demo-label') as HTMLInputElement;
+  const sortOrderEl  = document.getElementById('f-sort-order') as HTMLInputElement;
+  const submitBtn    = document.getElementById('btn-submit') as HTMLButtonElement;
+  const cancelBtn    = document.getElementById('btn-cancel') as HTMLButtonElement;
+  const projectList  = document.getElementById('project-list') as HTMLDivElement;
+  const logCount     = document.getElementById('log-count') as HTMLSpanElement;
+
+  isPrivateEl.addEventListener('change', () => {
+    githubLabel.style.display = isPrivateEl.checked ? 'none' : 'flex';
+    if (isPrivateEl.checked) githubUrlEl.value = '';
+  });
+
+  // Form submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    const entry = {
+      title: titleEl.value.trim(),
+      description: descEl.value.trim(),
+      github_url: isPrivateEl.checked ? '' : githubUrlEl.value.trim(),
+      is_private: isPrivateEl.checked,
+      demo_url: demoUrlEl.value.trim(),
+      demo_label: demoLabelEl.value.trim(),
+      sort_order: parseInt(sortOrderEl.value) || 0,
+    };
+
+    try {
+      if (editIdEl.value) {
+        await updateProject(editIdEl.value, entry);
+      } else {
+        await createProject(entry);
+      }
+      resetForm();
+      await loadList();
+    } catch (err: any) {
+      if (err.message === 'Unauthorized') {
+        alert('Session expired. Please re-enter the admin password.');
+        localStorage.removeItem('admin-token');
+        gate.classList.remove('hidden');
+        adminUI.classList.add('hidden');
+      } else {
+        alert('Failed to save. Please try again.');
+      }
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = editIdEl.value ? 'Save Changes' : 'Add Project';
+  });
+
+  cancelBtn.addEventListener('click', resetForm);
+
+  function resetForm() {
+    editIdEl.value = '';
+    titleEl.value = '';
+    descEl.value = '';
+    isPrivateEl.checked = false;
+    githubUrlEl.value = '';
+    githubLabel.style.display = 'flex';
+    demoUrlEl.value = '';
+    demoLabelEl.value = '';
+    sortOrderEl.value = '0';
+    submitBtn.textContent = 'Add Project';
+    cancelBtn.classList.add('hidden');
+  }
+
+  function editEntry(project: Project) {
+    editIdEl.value = project.id;
+    titleEl.value = project.title;
+    descEl.value = project.description;
+    isPrivateEl.checked = project.is_private;
+    githubUrlEl.value = project.github_url;
+    githubLabel.style.display = project.is_private ? 'none' : 'flex';
+    demoUrlEl.value = project.demo_url;
+    demoLabelEl.value = project.demo_label;
+    sortOrderEl.value = String(project.sort_order);
+    submitBtn.textContent = 'Save Changes';
+    cancelBtn.classList.remove('hidden');
+    form.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Load & render list
+  async function loadList() {
+    const projects = await fetchProjects();
+    logCount.textContent = `(${projects.length})`;
+    projectList.innerHTML = '';
+
+    if (projects.length === 0) {
+      projectList.innerHTML = '<p class="text-gray-600 text-sm">No projects added yet.</p>';
+      return;
+    }
+
+    for (const project of projects) {
+      const card = document.createElement('div');
+      card.className = 'bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex gap-4 items-start';
+
+      const meta: string[] = [];
+      if (project.is_private) meta.push('<span class="text-red-400">Private</span>');
+      else if (project.github_url) meta.push(`<a href="${project.github_url}" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline">GitHub</a>`);
+      if (project.demo_url) meta.push(`<a href="${project.demo_url}" class="text-blue-400 hover:text-blue-300 hover:underline">${project.demo_label || project.demo_url}</a>`);
+
+      card.innerHTML = `
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-bold text-white text-sm">${project.title}</span>
+            <span class="text-gray-600 text-xs">order: ${project.sort_order}</span>
+          </div>
+          ${project.description ? `<p class="text-gray-500 text-xs mt-1">${project.description.slice(0, 120)}${project.description.length > 120 ? '...' : ''}</p>` : ''}
+          ${meta.length ? `<div class="flex gap-3 mt-1.5 text-xs">${meta.join('')}</div>` : ''}
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button data-edit="${project.id}" class="text-gray-500 hover:text-blue-400 text-xs transition-colors">Edit</button>
+          <button data-del="${project.id}" class="text-gray-500 hover:text-red-400 text-xs transition-colors">Delete</button>
+        </div>
+      `;
+
+      card.querySelector(`[data-edit="${project.id}"]`)!.addEventListener('click', () => editEntry(project));
+      card.querySelector(`[data-del="${project.id}"]`)!.addEventListener('click', async () => {
+        if (!confirm(`Delete "${project.title}"?`)) return;
+        try {
+          await deleteProject(project.id);
+          await loadList();
+        } catch {
+          alert('Failed to delete. Session may have expired.');
+        }
+      });
+
+      projectList.appendChild(card);
+    }
+  }
+</script>

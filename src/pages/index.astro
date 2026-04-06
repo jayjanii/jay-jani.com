@@ -10,13 +10,36 @@ import pfp from '../assets/pfp.png';
     <!-- Top Nav: absolute so it does not shift the main column -->
     <nav class="absolute top-12 right-4 sm:right-6 lg:right-8 z-10 flex flex-col items-end" aria-label="Site">
       <button
-        id="admin-pill"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[68px]"
+        id="admin-login-pill"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer"
+        style="display:none"
       >
         <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
-        <span id="admin-pill-label">Admin</span>
+        Admin
+      </button>
+      <a
+        id="admin-enter-pill"
+        href="/projects/admin"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-blue-500/50 bg-blue-600/25 text-blue-300 shadow-sm hover:bg-blue-600/35 hover:border-blue-400 hover:text-white transition-colors mb-2"
+        style="display:none"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        Dashboard
+      </a>
+      <button
+        id="admin-logout-pill"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-red-500/50 bg-red-600/25 text-red-300 shadow-sm hover:bg-red-600/35 hover:border-red-400 hover:text-white transition-colors cursor-pointer mb-[102px]"
+        style="display:none"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+        Log Out
       </button>
       <a
         href="/reading"
@@ -79,68 +102,9 @@ import pfp from '../assets/pfp.png';
     <!-- Projects Section -->
     <section>
       <h2 class="text-2xl font-bold mb-8 text-white">Projects</h2>
-
-      <div class="space-y-12">
-        
-        <!-- ViT Attention Visualization Project -->
-        <article class="group relative bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:bg-gray-900/60 transition-colors">
-          <h3 class="text-xl font-bold mb-3 text-white">
-            ViT Attention Visualization
-          </h3>
-          <p class="text-gray-400 leading-relaxed mb-4 text-sm">
-            Personal learning project exploring how Vision Transformers "see" images by visualizing attention maps (last-layer and rollout) across 100 COCO images spanning cats, horses, cars, and bicycles. Uses <code class="text-gray-300">google/vit-large-patch16-224</code> (307M params).
-          </p>
-
-          <div class="flex gap-4 text-sm">
-            <a href="/attention" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-              View Write-up
-            </a>
-            <a href="https://github.com/jayjanii/attention-visualization" target="_blank" class="inline-flex items-center gap-1 text-gray-400 hover:text-gray-300 hover:underline">
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
-              GitHub Source
-            </a>
-          </div>
-        </article>
-
-        <!-- N-Body Simulation Project -->
-        <article class="group relative bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:bg-gray-900/60 transition-colors">
-          <h3 class="text-xl font-bold mb-3 text-white">
-            N-Body Gravitational Simulator
-          </h3>
-          <p class="text-gray-400 leading-relaxed mb-4 text-sm">
-            Real-time N-body gravitational simulation built with OpenGL 3.3 Core Profile. Uses a symplectic Velocity Verlet integrator for long-term energy conservation. The Solar System scenario uses real J2000 Keplerian orbital elements for accurate elliptical orbits with true 3D inclinations.
-          </p>
-          
-          <div class="flex gap-4 text-sm">
-            <a href="/nbody" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-              View Web Demo
-            </a>
-            <a href="https://github.com/jayjanii/n-body-sim" target="_blank" class="inline-flex items-center gap-1 text-gray-400 hover:text-gray-300 hover:underline">
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
-              GitHub Source
-            </a>
-          </div>
-        </article>
-
-        <!-- Personal Website Project -->
-        <article class="group relative bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:bg-gray-900/60 transition-colors">
-          <h3 class="text-xl font-bold mb-3 text-white">
-            Personal Website
-          </h3>
-          <p class="text-gray-400 leading-relaxed mb-4 text-sm">
-            This site: a personal developer portfolio built with Astro and deployed on Cloudflare Pages. Includes a full-stack climbing log that lets me track and review my climbing sessions, backed by a Cloudflare D1 (SQLite) database with a password-protected admin API.
-          </p>
-
-          <div class="flex gap-4 text-sm">
-            <span class="inline-flex items-center gap-1 text-gray-500 cursor-default select-none">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-              Source not public
-            </span>
-          </div>
-        </article>
-
+      <div id="project-list" class="space-y-12"></div>
+      <div id="project-empty" class="text-center py-8 hidden">
+        <p class="text-gray-600 text-sm">No projects yet.</p>
       </div>
     </section>
 
@@ -154,9 +118,10 @@ import pfp from '../assets/pfp.png';
 
 <script>
   import { verifyPassword } from '../lib/climbing';
+  import { type Project, fetchProjects } from '../lib/projects';
 
+  // ── Copy-to-clipboard toast ──
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
-
   document.querySelectorAll<HTMLButtonElement>('.copy-email').forEach((btn) => {
     btn.addEventListener('click', () => {
       const email = btn.dataset.copy ?? '';
@@ -174,29 +139,33 @@ import pfp from '../assets/pfp.png';
     });
   });
 
-  const adminPill  = document.getElementById('admin-pill') as HTMLButtonElement;
-  const pillLabel  = document.getElementById('admin-pill-label')!;
-  const gate       = document.getElementById('auth-gate') as HTMLDivElement;
-  const authPw     = document.getElementById('auth-password') as HTMLInputElement;
-  const authErr    = document.getElementById('auth-error') as HTMLParagraphElement;
-  const authBtn    = document.getElementById('auth-submit') as HTMLButtonElement;
-  const cancelBtn  = document.getElementById('auth-cancel') as HTMLButtonElement;
+  // ── Admin pills ──
+  const loginPill   = document.getElementById('admin-login-pill') as HTMLButtonElement;
+  const enterPill   = document.getElementById('admin-enter-pill') as HTMLAnchorElement;
+  const logoutPill  = document.getElementById('admin-logout-pill') as HTMLButtonElement;
+  const gate        = document.getElementById('auth-gate') as HTMLDivElement;
+  const authPw      = document.getElementById('auth-password') as HTMLInputElement;
+  const authErr     = document.getElementById('auth-error') as HTMLParagraphElement;
+  const authBtn     = document.getElementById('auth-submit') as HTMLButtonElement;
+  const cancelBtn   = document.getElementById('auth-cancel') as HTMLButtonElement;
 
   function updatePillState() {
     const loggedIn = !!localStorage.getItem('admin-token');
-    pillLabel.textContent = loggedIn ? 'Log Out' : 'Admin';
+    loginPill.style.display  = loggedIn ? 'none' : 'inline-flex';
+    enterPill.style.display  = loggedIn ? 'inline-flex' : 'none';
+    logoutPill.style.display = loggedIn ? 'inline-flex' : 'none';
   }
 
-  adminPill.addEventListener('click', () => {
-    if (localStorage.getItem('admin-token')) {
-      localStorage.removeItem('admin-token');
-      updatePillState();
-    } else {
-      authErr.classList.add('hidden');
-      authPw.value = '';
-      gate.classList.remove('hidden');
-      authPw.focus();
-    }
+  loginPill.addEventListener('click', () => {
+    authErr.classList.add('hidden');
+    authPw.value = '';
+    gate.classList.remove('hidden');
+    authPw.focus();
+  });
+
+  logoutPill.addEventListener('click', () => {
+    localStorage.removeItem('admin-token');
+    updatePillState();
   });
 
   async function tryAuth() {
@@ -226,4 +195,46 @@ import pfp from '../assets/pfp.png';
   });
 
   updatePillState();
+
+  // ── SVG constants for project cards ──
+  const eyeSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+  const ghSvg = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>';
+  const lockSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>';
+
+  // ── Dynamic project rendering ──
+  const projectListEl = document.getElementById('project-list') as HTMLDivElement;
+  const projectEmpty  = document.getElementById('project-empty') as HTMLDivElement;
+
+  async function loadProjects() {
+    const projects = await fetchProjects();
+
+    projectEmpty.style.display = projects.length === 0 ? 'block' : 'none';
+    projectListEl.innerHTML = '';
+
+    for (const p of projects) {
+      const links: string[] = [];
+
+      if (p.demo_url) {
+        const isExternal = p.demo_url.startsWith('http');
+        links.push(`<a href="${p.demo_url}"${isExternal ? ' target="_blank"' : ''} class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline">${eyeSvg}${p.demo_label || p.demo_url}</a>`);
+      }
+
+      if (p.is_private) {
+        links.push(`<span class="inline-flex items-center gap-1 text-gray-500 cursor-default select-none">${lockSvg}Source not public</span>`);
+      } else if (p.github_url) {
+        links.push(`<a href="${p.github_url}" target="_blank" class="inline-flex items-center gap-1 text-gray-400 hover:text-gray-300 hover:underline">${ghSvg}GitHub Source</a>`);
+      }
+
+      const article = document.createElement('article');
+      article.className = 'group relative bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:bg-gray-900/60 transition-colors';
+      article.innerHTML = `
+        <h3 class="text-xl font-bold mb-3 text-white">${p.title}</h3>
+        ${p.description ? `<p class="text-gray-400 leading-relaxed mb-4 text-sm">${p.description}</p>` : ''}
+        ${links.length ? `<div class="flex gap-4 text-sm">${links.join('')}</div>` : ''}
+      `;
+      projectListEl.appendChild(article);
+    }
+  }
+
+  loadProjects();
 </script>
