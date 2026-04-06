@@ -261,8 +261,8 @@ import Layout from '../../layouts/Layout.astro';
           ${meta.length ? `<div class="flex gap-3 mt-1.5 text-xs">${meta.join('')}</div>` : ''}
         </div>
         <div class="flex gap-2 shrink-0">
-          <button data-edit="${project.id}" class="text-gray-500 hover:text-blue-400 text-xs transition-colors">Edit</button>
-          <button data-del="${project.id}" class="text-gray-500 hover:text-red-400 text-xs transition-colors">Delete</button>
+          <button type="button" data-edit="${project.id}" class="cursor-pointer text-gray-500 hover:text-blue-400 text-xs transition-colors">Edit</button>
+          <button type="button" data-del="${project.id}" class="cursor-pointer text-gray-500 hover:text-red-400 text-xs transition-colors">Delete</button>
         </div>
       `;
 

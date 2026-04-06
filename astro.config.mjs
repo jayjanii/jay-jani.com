@@ -13,6 +13,9 @@ export default defineConfig({
   session: {
     driver: { entrypoint: 'unstorage/drivers/null' },
   },
+  prefetch: {
+    defaultStrategy: 'hover',
+  },
   vite: {
     plugins: [tailwindcss()],
   },

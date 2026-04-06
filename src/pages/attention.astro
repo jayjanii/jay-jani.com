@@ -118,8 +118,10 @@ import Layout from '../layouts/Layout.astro';
         <img
           src="https://raw.githubusercontent.com/jayjanii/attention-visualization/master/attention2.png"
           alt="Last layer attention map example showing noisy output"
-          class="w-full object-contain max-h-80"
-          loading="lazy"
+          class="w-full object-contain max-h-80 min-h-[12rem] bg-black"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
         />
         <figcaption class="text-xs text-gray-500 text-center py-2 px-4">
           Last layer attention — noisy and not informative. Attention rollout proved significantly more useful.

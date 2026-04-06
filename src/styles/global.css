@@ -7,6 +7,16 @@
 /* Reserve scrollbar width on the viewport so content doesn’t shift when overflow toggles. */
 html {
   scrollbar-gutter: stable;
+  background-color: #0f0f0f;
+  color-scheme: dark;
+}
+
+/* Astro ClientRouter: same-origin soft navigations without cross-fade (native View Transitions default). */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*),
+::view-transition-image-pair(*) {
+  animation: none !important;
 }
 
 body {
