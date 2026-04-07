@@ -7,3 +7,6 @@ compatibility_date = "2024-12-01"
 binding = "DB"
 database_name = "climbing-logs"
 database_id = "570ba0bf-31aa-4dcd-aa43-221f4ec4c8d2"
+
+[ai]
+binding = "AI"

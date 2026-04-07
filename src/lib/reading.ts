@@ -72,3 +72,14 @@ export async function deletePaper(id: string): Promise<void> {
   if (res.status === 401) throw new Error('Unauthorized');
   if (!res.ok) throw new Error('Failed to delete');
 }
+
+export async function suggestTags(title: string, authors: string): Promise<string[]> {
+  const res = await fetch('/api/suggest-tags', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ title, authors }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as { tags: string[] };
+  return data.tags ?? [];
+}
